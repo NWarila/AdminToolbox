@@ -10,22 +10,22 @@ A powershell wrapper for quser that allows the application to be easily run agai
 Accepts a string list of computers and will run quser application against each of them. 
 
 ### EXAMPLE
-  PS C:\Windows\system32> start-quser
+    PS C:\Windows\system32> start-quser
 
-  Hostname     : COMPUTER-SS8I7
-  USERNAME     : HellBomb
-  SESSIONNAME  : console
-  ID           : 1
-  STATE        : Active
-  LogonTime    : 6/20/2020 2:17:00 PM
-  TotalMinutes : 11304
+    Hostname     : COMPUTER-SS8I7
+    USERNAME     : HellBomb
+    SESSIONNAME  : console
+    ID           : 1
+    STATE        : Active
+    LogonTime    : 6/20/2020 2:17:00 PM
+    TotalMinutes : 11304
 
 ### EXAMPLE
-  PS C:\Windows\system32> start-quser |ft
+    PS C:\Windows\system32> start-quser |ft
 
-  Hostname     USERNAME SESSIONNAME ID STATE  LogonTime            TotalMinutes
-  --------     -------- ----------- -- -----  ---------            ------------
-  UCFO-6CWRWT2 nrwaril  console     1  Active 6/20/2020 2:17:00 PM        11306
+    Hostname     USERNAME SESSIONNAME ID STATE  LogonTime            TotalMinutes
+    --------     -------- ----------- -- -----  ---------            ------------
+    UCFO-6CWRWT2 nrwaril  console     1  Active 6/20/2020 2:17:00 PM        11306
 
 ### NOTES
 VERSION     DATE			NAME						DESCRIPTION
