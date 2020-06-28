@@ -10,9 +10,9 @@ A powershell wrapper for quser that allows the application to be easily run agai
 Accepts a string list of computers and will run quser application against each of them. 
 
 ### .NOTES
-    VERSION     DATE			NAME						DESCRIPTION
+    VERSION     DATE			NAME					DESCRIPTION
     ___________________________________________________________________________________________________________
-    1.0         28 June 2020	        Warilia, Nicholas R.		    Initial version
+    1.0         28 June 2020	        Warilia, Nicholas R.		        Initial version
 
 Credits:
 (1) Script Template: https://gist.github.com/9to5IT/9620683
