@@ -19,7 +19,7 @@ Function Start-QUser {
         PS C:\Windows\system32> start-quser
 
         Hostname     : COMPUTER-SS8I7
-        USERNAME     : nrwaril
+        USERNAME     : HellBomb
         SESSIONNAME  : console
         ID           : 1
         STATE        : Active
@@ -31,7 +31,16 @@ Function Start-QUser {
 
         Hostname     USERNAME SESSIONNAME ID STATE  LogonTime            TotalMinutes
         --------     -------- ----------- -- -----  ---------            ------------
-        COMPUTER-SS8I7 nrwaril  console     1  Active 6/20/2020 2:17:00 PM        11306
+        UCFO-6CWRWT2 nrwaril  console     1  Active 6/20/2020 2:17:00 PM        11306
+
+    .EXAMPLE
+        PS C:\Windows\system32> start-quser -Servers $env:COMPUTERNAME,"COMP-RDS01","COMP-DC01","COMP-713V3TW","COMP-T217VT3" |ft
+
+        Hostname     USERNAME SESSIONNAME ID STATE  LogonTime            TotalMinutes
+        --------     -------- ----------- -- -----  ---------            ------------
+        COMP-713V3TW nrwaril  console     1  Active 6/20/2020 2:17:00 PM        11328
+        COMP-T217VT3 nrwaril  console     4  Active 5/11/2020 8:42:00 AM        69263
+        UCFO-72T1VT3 nrwaril  console     8  Active 5/19/2020 9:46:00 AM        57679
 
     .NOTES
     VERSION     DATE			NAME						DESCRIPTION
@@ -43,7 +52,7 @@ Function Start-QUser {
 
 #>
     Param (
-        [String]$Servers = $env:COMPUTERNAME
+        [String[]]$Servers = $env:COMPUTERNAME
     )
 
     <# One Liner that does roughly the same thing about 30MS faster.
@@ -84,4 +93,3 @@ Function Start-QUser {
     }
     Return $Results
 }
-Start-QUser
