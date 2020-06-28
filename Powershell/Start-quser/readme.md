@@ -34,3 +34,10 @@ Accepts a string list of computers and will run quser application against each o
     Hostname     USERNAME SESSIONNAME ID STATE  LogonTime            TotalMinutes
     --------     -------- ----------- -- -----  ---------            ------------
     COMPUTER-SS8I7 nrwaril  console     1  Active 6/20/2020 2:17:00 PM        11306
+    
+### EXAMPLE 3
+    Hostname     USERNAME SESSIONNAME ID STATE  LogonTime            TotalMinutes
+    --------     -------- ----------- -- -----  ---------            ------------
+    COMP-713V3TW nrwaril  console     1  Active 6/20/2020 2:17:00 PM        11328
+    COMP-T217VT3 nrwaril  console     4  Active 5/11/2020 8:42:00 AM        69263
+    UCFO-72T1VT3 nrwaril  console     8  Active 5/19/2020 9:46:00 AM        57679
