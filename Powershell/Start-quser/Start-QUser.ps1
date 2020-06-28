@@ -19,7 +19,7 @@ Function Start-QUser {
         PS C:\Windows\system32> start-quser
 
         Hostname     : COMPUTER-SS8I7
-        USERNAME     : HellBomb
+        USERNAME     : nrwaril
         SESSIONNAME  : console
         ID           : 1
         STATE        : Active
@@ -31,7 +31,7 @@ Function Start-QUser {
 
         Hostname     USERNAME SESSIONNAME ID STATE  LogonTime            TotalMinutes
         --------     -------- ----------- -- -----  ---------            ------------
-        UCFO-6CWRWT2 nrwaril  console     1  Active 6/20/2020 2:17:00 PM        11306
+        COMPUTER-SS8I7 nrwaril  console     1  Active 6/20/2020 2:17:00 PM        11306
 
     .NOTES
     VERSION     DATE			NAME						DESCRIPTION
