@@ -14,8 +14,8 @@ Accepts a string list of computers and will run quser application against each o
     ___________________________________________________________________________________________________________
     1.0         28 June 2020	        Warilia, Nicholas R.		        Initial version
 
-Credits:
-(1) Script Template: https://gist.github.com/9to5IT/9620683
+    Credits:
+    (1) Script Template: https://gist.github.com/9to5IT/9620683
 
 ### EXAMPLE 1
     PS C:\Windows\system32> start-quser
