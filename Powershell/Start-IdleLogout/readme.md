@@ -10,7 +10,7 @@ Intended to be used with Scheduled Task triggered on session lock to disconnect 
 ### .NOTES
     VERSION     DATE			NAME						DESCRIPTION
 	___________________________________________________________________________________________________________
-	1.0     30 June 2020		Nick W.						Initial version
+	1.0     	30 June 2020		Nick W.						Initial version
 
 	License: GPLv3
 	Min PS Ver: 3.0
