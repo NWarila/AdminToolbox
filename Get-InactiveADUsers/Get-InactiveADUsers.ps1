@@ -28,7 +28,7 @@ Param (
     [Int]$DaysInactive = 30,
 
     [Parameter(Position=1,ValueFromPipelineByPropertyName=$True)]
-    [string[]]$ExclusionGroups = @("UCMS_ServiceAccounts","UCMS_SYSAccounts_SU")
+    [string[]]$ExclusionGroups = @("")
 )
 
 Function Get-GroupMembers {
