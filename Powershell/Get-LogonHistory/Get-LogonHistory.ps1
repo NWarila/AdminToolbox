@@ -18,11 +18,9 @@
         None
 
     .NOTES
-
     VERSION     DATE			NAME						DESCRIPTION
 	___________________________________________________________________________________________________________
 	1.0         20 August 2020	Warilia, Nicholas R.		Initial version
-
     Credits:
         (1) Script Template: https://gist.github.com/9to5IT/9620683
 #>
@@ -47,15 +45,23 @@ ForEach ($Computer in $Computers) {
 
 $Results = New-Object System.Collections.ArrayList
 ForEach ($Event in $Script.Events) {
-    ForEach ($Line in ($Test4 -split "`r`n")) {
-        IF ([String]::IsNullOrWhiteSpace($Line)) { continue }
-        Switch -Wildcard ($Line.Trim()) {
-            "Security ID:*"    {$nSecurityID    = ($_ -split "Security ID:")[1].trim()}
-            "Account Name:*"   {$nAccountName   = ($_ -split "Account Name:")[1].trim()}
-            "Account Domain:*" {$nAccountDomain = ($_ -split "Account Domain:")[1].trim()}
-            "Session ID:*"     {$nSessionID     = ((($_ -split "Session ID:")[1]).split(";")[0]).Trim()}
+    IF ([Int]$Event.ID -in @('4800','4801')) {
+        ForEach ($Line in ($Event.message -split "`r`n")) {
+            IF ([String]::IsNullOrWhiteSpace($Line)) { continue }
+            Switch -Wildcard ($Line.Trim()) {
+                "Security ID:*"    {$nSecurityID    = ($_ -split "Security ID:")[1].trim()}
+                "Account Name:*"   {$nAccountName   = ($_ -split "Account Name:")[1].trim()}
+                "Account Domain:*" {$nAccountDomain = ($_ -split "Account Domain:")[1].trim()}
+                "Session ID:*"     {$nSessionID     = ((($_ -split "Session ID:")[1]).split(";")[0]).Trim()}
+            }
         }
+    } Else {
+        $nSecurityID    = New-Object System.Security.Principal.SecurityIdentifier ($Event.Properties.Value.Where({$_.AccountDomainSid -ne $Null})).value
+        $Translate      = $nSecurityID.Translate( [System.Security.Principal.NTAccount]).Value.Split("\")
+        $nAccountName   = $Translate[1]
+        $nAccountDomain = $Translate[0]
     }
+
     Switch ($Event.ID) {
         4800 {$nMessage = "The workstation was locked."}
         4801 {$nMessage = "The workstation was unlocked."}
@@ -74,7 +80,8 @@ ForEach ($Event in $Script.Events) {
         LogName       = $Event.LogName
         ComputerName  = $Event.MachineName
     })
-    Remove-Variable -Name @("Event","nSecurityID","nAccountName","nAccountDomain","nSessionID","nMessage") -ErrorAction SilentlyContinue
+    Remove-Variable -Name @("Event","Translate","nSecurityID","nAccountName","nAccountDomain","nSessionID","nMessage") -ErrorAction SilentlyContinue
 }
-$Results
+
+$Results |Format-Table @{Name = "Account"; Expression = { "$($_.AccountDomain)\$($_.AccountName)"} },Message,TimeCreated
 Remove-Variable -Name @("Script","Results") -ErrorAction SilentlyContinue
