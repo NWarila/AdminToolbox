@@ -1,4 +1,4 @@
-New-Variable -name ADSI -value (([ADSI]"WinNT://localhost").psbase.children) -Force -ErrorAction Stop
+New-Variable -name ADSI -value (([ADSI]"WinNT://$($Env:ComputerName)").psbase.children) -Force -ErrorAction Stop
 New-Variable -Name LocalAccounts -Value (New-Object System.Collections.ArrayList) -Force -ErrorAction Stop
 $ADSI | Where-Object {$_.schemaClassName -match "user"} | foreach-object {
     [Void]$LocalAccounts.add([PSCustomObject]@{
