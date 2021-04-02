@@ -5,6 +5,12 @@ Function Start-SystemCustomizer {
 
         .DESCRIPTION
             
+        .PARAMETER TargetUser
+            
+            CurrentUser
+            DefaultUser
+            Both
+
         .PARAMETER MinimizedStateTabletModeOff
             [Int] Used to determine the default state of the ribbon in explorer when tablet mode is off.
                 0 = Expanded
@@ -14,6 +20,27 @@ Function Start-SystemCustomizer {
             [Int] Used to determine the default state of the ribbon in explorer when tablet mode is on.
                 0 = Expanded
                 1 = Minimized
+
+        .PARAMETER WindowsFeedbackFrequency
+            [String] Change how frequently Windows should ask for feedback.
+                Automatically
+                Never
+                Always
+                Daily
+                Weekly
+
+        .PARAMETER LetAppsActivateWithVoiceCU
+            [Int] Specifies if Windows apps can be activated by voice.
+                0 = Windows apps cannot be activated by voice.
+                1 = Windows apps can be activated by voice.
+
+        .PARAMETER LetAppsActivateWithVoiceAboveLockCU
+            [Int] Specifies if Windows apps can be activated by voice while the screen is locked.
+                0 =  Windows apps cannot be activated by voice while the screen is locked.
+                1 =  Windows apps can be activated by voice while the screen is locked.
+        
+        .PARAMETER DisableAdvertisingIdCU
+        [Int] (System Setting) Added in Windows 10, version 1607. Enables or disables the Advertising ID for the current user.
 
         .PARAMETER Confirm
             [Int] Determine what type of changes should be prompted before executing.
@@ -25,12 +52,37 @@ Function Start-SystemCustomizer {
                 Note: This configuration will take priority over Debugger settings for confirm action preference.
 
         .PARAMETER TimeZone
-            [String] Configure your time zone. To get a full list of time zones using 'Get-TimeZone -ListAvailable |Select ID'
+            [String] (System Setting) Configure your time zone. To get a full list of time zones using 'Get-TimeZone -ListAvailable |Select ID'
         
         .PARAMETER DoNotShowFeedbackNotifications
             [Int] (System Setting) Configure Windows Feedback Notifications
                 0 = Enable Windows Feedback Notifications
                 1 = Disable Windows Feedback Notifications
+        
+        .PARAMETER LetAppsActivateWithVoiceAllUsers
+            [Int] (System Setting) Specifies if Windows apps can be activated by voice.
+                0 = User in control. Users can decide if Windows apps can be activated by voice using Settings > Privacy options on the device.
+                1 = Force allow. Windows apps can be activated by voice and users cannot change it.
+                2 = Force deny. Windows apps cannot be activated by voice and users cannot change it.
+        
+        .PARAMETER LetAppsActivateWithVoiceAboveLockAllUsers
+            [Int] (System Setting) Specifies if Windows apps can be activated by voice while the screen is locked.
+                0 = User in control. Users can decide if Windows apps can be activated by voice while the screen is locked using Settings > Privacy options on the device.
+                1 = Force allow. Windows apps can be activated by voice while the screen is locked, and users cannot change it.
+                2 = Force deny. Windows apps cannot be activated by voice while the screen is locked, and users cannot change it.
+        
+        .PARAMETER AllowCrossDeviceClipboard
+            [Int] (System Setting) Added in Windows 10, version 1809. Specifies whether clipboard items roam across devices. When this is allowed, an item copied to the clipboard is uploaded to the cloud so that other devices can access. Also, when this is allowed, a new clipboard item on the cloud is downloaded to a device so that user can paste on the device.
+                0 = Not allowed
+                1 = Allowed
+
+        .PARAMETER OnlineSpeechRecognition
+            [Int] (System Setting) Updated in Windows 10, version 1809. This policy specifies whether users on the device have the option to enable online speech recognition. When enabled, users can use their voice for dictation and to talk to Cortana and other apps that use Microsoft cloud-based speech recognition. Microsoft will use voice input to help improve our speech services. If the policy value is set to 0, online speech recognition will be disabled and users cannot enable online speech recognition via settings. If policy value is set to 1 or is not configured, control is deferred to users.
+                0 = Not allowed
+                1 = Allowed
+        
+        .PARAMETER DisableAdvertisingId
+        [Int] (System Setting) Added in Windows 10, version 1607. Enables or disables the Advertising ID.
 
         .PARAMETER Debugger
             [Int] Used primarily to quickly apply multiple arguments making script development and debugging easier. Useful only for developers.
@@ -71,6 +123,12 @@ Function Start-SystemCustomizer {
 
         To Do List:
             (1) Get Powershell Path based on version (stock powershell, core, etc.)
+
+        Research/Additional Information
+            (1) https://docs.microsoft.com/en-us/windows/privacy/manage-connections-from-windows-operating-system-components-to-microsoft-services
+            (2) https://www.tenforums.com/tutorials/130122-allow-deny-apps-access-use-voice-activation-windows-10-a.html
+            (3) https://gist.github.com/goyuix/fd68db59a4f6355ee0f6
+            (4) https://stackoverflow.com/questions/31620763/no-garbage-collection-while-powershell-pipeline-is-executing
     #>
 
     [CmdletBinding(
@@ -81,16 +139,30 @@ Function Start-SystemCustomizer {
         SupportsShouldProcess=$False,
         PositionalBinding=$True
     )] Param (
+        [ValidateSet("CurrentUser","Both","DefaultUser")]
+        $TargetUser,
         [ValidateSet(0,1)]
         $MinimizedStateTabletModeOff=0,
         [ValidateSet(0,1)]
         $MinimizedStateTabletModeOn=0,
         [ValidateSet("Automatically","Never","Always","Daily","Weekly")]
         $WindowsFeedbackFrequency = "Never",
+        [ValidateSet(0,1)]
+        $LetAppsActivateWithVoiceCU,
+        [ValidateSet(0,1)]
+        $LetAppsActivateWithVoiceAboveLockCU,
         #System Configration
         $TimeZone = "Eastern Standard Time",
         [ValidateSet(0,1)]
         $DoNotShowFeedbackNotifications,
+        [ValidateSet(0,1,2)]
+        $LetAppsActivateWithVoiceAllUsers,
+        [ValidateSet(0,1,2)]
+        $LetAppsActivateWithVoiceAboveLockAllUsers,
+        [ValidateSet(0,1)]
+        $AllowCrossDeviceClipboard,
+        [ValidateSet(0,1)]
+        $OnlineSpeechRecognition,
         [ValidateSet(0,1,2)]
         [Int]$Confim = 1,
         [ValidateSet(0,1,2)]
@@ -106,6 +178,17 @@ Function Start-SystemCustomizer {
         #Should script enforce running as admin.
         RequireAdmin = $False
     }
+
+    #User Configurations
+    $LetAppsActivateWithVoiceCU = 0
+    $LetAppsActivateWithVoiceAboveLockCU = 0
+
+    #System Configurations
+    $DoNotShowFeedbackNotifications
+    $LetAppsActivateWithVoiceAllUsers = 2
+    $LetAppsActivateWithVoiceAboveLockAllUsers = 2
+    $AllowCrossDeviceClipboard = 0
+    $OnlineSpeechRecognition = 0
 
     #------------------------------------------------------ [Required Functions] -----------------------------------------------------
     #Settting requirements to run the script can help ensure script execution consistency.
@@ -431,16 +514,253 @@ Function Start-SystemCustomizer {
             [ValidateNotNullOrEmpty()]
             [ValidateSet("HKEY_USERS","HKEY_CLASSES_ROOT","HKEY_CURRENT_CONFIG","HKEY_CURRENT_USER","HKEY_LOCAL_MACHINE")]
             [String]$RegistryHive,
-
-            [Parameter(Mandatory=$False)]
             [Bool]$CreateKey = $True,
-
             [ValidateSet(0,1,2)]
             [Int]$Confim = 2,
-
-            [Parameter(Mandatory=$False)]
             [Bool]$FixDataType = $False
         )
+
+        #This is custom entry to save several hundred lines of code throughout the script. If this function is used elsewhere it should be removed.
+        IF ([String]::IsNullOrWhiteSpace($Script:DefaultUserPath) -eq $False -AND $RegistryHive -eq "HKEY_CURRENT_USER") {
+            IF ($Script:TargetUser -eq "Both") {
+                Set-RegistryKey -RegistryHive HKEY_LOCAL_MACHINE -Path "$DefaultUserPath\$Path" -DataType $DataType  -Name $Name -Value $Value -CreateKey $CreateKey -Confim $Confim -FixDataType $FixDataType
+            } ElseIF ($Script:TargetUser -eq "DefaultUser") {
+                Set-Variable -Name RegistryHive -Value "HKEY_LOCAL_MACHINE" -Force -ErrorAction Stop -Verbose:$Verbose
+                Set-Variable -Name Path -Value "$DefaultUserPath\$Path" -Force -ErrorAction Stop -Verbose:$Verbose
+            }
+        }
+
+        IF ($PSBoundParameters.ContainsKey('Verbose')) {
+            Set-Variable -Name Verbose -Value $True
+        } Else {
+            Set-Variable -Name Verbose -Value ([Bool]$Script:Verbose)
+        }
+
+        IF ($PSBoundParameters.ContainsKey('Confirm')) {
+            Set-Variable -Name Confirm -Value $Confirm
+        } Else {
+            Set-Variable -Name Confirm -Value ([Bool]$Script:Confirm)
+        }
+
+        Switch ($Confirm) {
+            0 {$ConfimEnv = $True;  $ConfirmChg = $True}
+            1 {$ConfimEnv = $False; $ConfirmChg = $True}
+            2 {$ConfimEnv = $False; $ConfirmChg = $False}
+        }
+
+        
+
+        #Debug info to help with troubleshooting. Provides detailed variable information to better understand how the function was called.
+        Write-nLog -Type Debug -Message "`$Path: $Path"
+        Write-nLog -Type Debug -Message "`$DataType: $DataType"
+        Write-nLog -Type Debug -Message "`$Name: $Name"
+        Write-nLog -Type Debug -Message "`$Value: $Value"
+        Write-nLog -Type Debug -Message "`$RegistryHive: $RegistryHive"
+        Write-nLog -Type Debug -Message "`$CreateKey: $CreateKey"
+        Write-nLog -Type Debug -Message "`$FixDataType: $FixDataType"
+
+        #Create variables needed throughout function.
+        New-Variable -Name NewKey             -Value $False -Force -ErrorAction Stop -Verbose:$Verbose
+        New-Variable -Name SetItemProperty    -Value $False -Force -ErrorAction Stop -Verbose:$Verbose
+        New-Variable -Name UpdateItemProperty -Value $True  -Force -ErrorAction Stop -Verbose:$Verbose
+        New-Variable -Name HiveTypeDB                       -Force -ErrorAction Stop -Verbose:$Verbose -Value @{
+            'HKEY_USERS'          = [Microsoft.Win32.RegistryHive]::Users
+            'HKEY_CLASSES_ROOT'   = [Microsoft.Win32.RegistryHive]::ClassesRoot
+            'HKEY_CURRENT_CONFIG' = [Microsoft.Win32.RegistryHive]::CurrentConfig
+            'HKEY_CURRENT_USER'   = [Microsoft.Win32.RegistryHive]::CurrentUser
+            'HKEY_LOCAL_MACHINE'  = [Microsoft.Win32.RegistryHive]::LocalMachine
+        }
+        New-Variable -Name DataTypeDB                       -Force -ErrorAction Stop -Verbose:$Verbose -Value @{
+            'REG_BINARY'    = [Microsoft.Win32.RegistryValueKind]::Binary
+            'REG_DWORD'     = [Microsoft.Win32.RegistryValueKind]::DWord
+            'REG_EXPAND_SZ' = [Microsoft.Win32.RegistryValueKind]::ExpandString
+            'REG_MULTI_SZ'  = [Microsoft.Win32.RegistryValueKind]::MultiString
+            'REG_SZ'        = [Microsoft.Win32.RegistryValueKind]::String
+            'REG_QWORD'     = [Microsoft.Win32.RegistryValueKind]::QWord
+            'REG_NONE'      = [Microsoft.Win32.RegistryValueKind]::None
+        }
+
+        #Trim the path if needed.
+        Set-Variable -Name Path -Value ($Path.Trim("\")) -Force -ErrorAction Stop -Verbose:$Verbose
+
+
+        #Test if the path exists
+        If (Test-Path -Path Registry::$RegistryHive\$Path -PathType Container -Verbose:$Verbose) {
+            Write-nLog -Type Debug -Message "Registry key does exist."
+            New-Variable -Name RegistryKey    -Value ([Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey($HiveTypeDB[$RegistryHive],$env:COMPUTERNAME)) -Force -Verbose:$Verbose
+            New-Variable -Name RegistrySubKey -Value ($RegistryKey.OpenSubKey($Path)) -Force -Verbose:$Verbose
+        } Else { #endIf: If the path doesn't exist, throw an error.
+            Write-nLog -Type Info -Message "Registry Key does not exist."
+            If ($CreateKey) {
+                Write-nLog -Type Debug -Message "Attempting to create registry key."
+                Try {
+                    New-Variable -Name RegistryKey    -Value ([Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey($HiveTypeDB[$RegistryHive],$env:COMPUTERNAME)) -Force -Verbose:$Verbose
+                    New-Variable -Name RegistrySubKey -Value ($RegistryKey.CreateSubKey($Path)) -Force -Verbose:$Verbose
+                    Write-nLog -Type Info -Message "Successfully created registry key."
+                    Set-Variable -Name NewKey   -Value $True -Force -Verbose:$Verbose
+                } Catch {
+                    Write-nLog -Type Error -Message "Unable to create registry key."
+                    $Global:SSCError = $Error[0]
+                    $RegistrySubKey.Close()
+                    $RegistryKey.close()
+                    return
+                }
+            } Else { #ElseIf: $CreateKey
+                
+            } #EndIf: $CreateKey
+        }
+        
+        If (Test-Path Variable:\RegistrySubKey) {
+            IF ($NewKey -eq $False) {
+                Write-nLog -Type Debug -Message "Checking to see if registry property exists."
+                IF ($RegistrySubKey.GetValueNames().Contains($Name) -EQ $True) {
+                    $RegistrySubKey.SetValue($Name,$Value,$DataTypeDB[$DataType])
+                    Set-Variable -Name SetItemProperty -Value $True -Force -ErrorAction Stop -Verbose:$Verbose
+                    IF ($RegistrySubKey.GetValueKind("$Name") -ne $DataTypeDB[$DataType]) {
+                        Write-nLog -Type Info -Message "Registry property type is '$($RegistryKey.GetValueKind($Name))' but expected '$($DataTypeDB[$DataType])."
+                        If ($FixDataType) {
+                            Write-nLog -Type Debug -Message "Attempting to remove registry key property to change ItemType."
+                            Try {
+                                $RegistrySubKey.DeleteValue("$Name")
+                                Write-nLog -Type Info -Message "Successfully removed 'Registry::$RegistryHive\$Path\$Name'."
+                                Set-Variable -Name SetItemProperty -Value $False -Force -ErrorAction Stop -Verbose:$Verbose
+                            } Catch {
+                                Write-nLog -Type Error -Message "Failed to remove 'Registry::$RegistryHive\$Path\$Name'."
+                                $Global:SSCError = $Error[0]
+                                $RegistrySubKey.Close()
+                                $RegistryKey.close()
+                                return
+                            }
+                        } Else { #ElseIf: $FixDataType
+                            Write-nLog -Type Warning -Message "Registry property type is '$($RegistryKey.GetValueKind("$Name"))' but expected '$($DataTypeDB[$DataType])."
+                        } #EndIf: $FixDataType
+                    } Else {
+                        #Check to see if the current registry value is the same as the desired value
+                        IF ($RegistrySubKey.GetValue($Name) -eq $Value) {
+                            Set-Variable -Name UpdateItemProperty -Value $False -Force -ErrorAction Stop -Verbose:$Verbose
+                        }
+                    }
+                } #EndIf
+            }
+
+            #If registry key already desired value, no changes needed.
+            if ($UpdateItemProperty) {
+                IF ($SetItemProperty) {
+                    Write-nLog -Type Debug -Message "Attempting to set item property value."
+                    Try {
+                        $RegistrySubKey.SetValue($Name,$Value)
+                        Write-nLog -Type Info -Message "Successfully set '$RegistryHive\$Path\$Value' to '$Value'."
+                    } Catch {
+                        Write-nLog -Type Error -Message "Failed to set '$RegistryHive\$Path\$Value' to '$Value'."
+                        $Global:SSCError = $Error[0]
+                        $RegistrySubKey.Close()
+                        $RegistryKey.close()
+                        return
+                    }
+                } Else {#ElseIf: SetItemProprty
+                    Write-nLog -Type Debug -Message "Attempting to create item property and set value."
+                    Try {
+                        $RegistrySubKey.SetValue($Name,$Value,$DataTypeDB[$DataType])
+                        Write-nLog -Type Info -Message "Successfully added '$RegistryHive\$Path\$Value' property and set value to '$Value'."
+                    } Catch [System.UnauthorizedAccessException] {
+                        Write-nLog -Type Error -Message "Access denied when attempting to set '$RegistryHive\$Path\$Value' to '$Value'."
+                    } Catch {
+                        Write-nLog -Type Error -Message "Failed to set '$RegistryHive\$Path\$Value' to '$Value'."
+                        $Global:SSCError = $Error[0]
+                        $RegistrySubKey.Close()
+                        $RegistryKey.close()
+                        return
+                    }
+                }#EndIf: $SetItemProperty
+            } Else {#ElseIf: $UpdateItemProperty
+                Write-nLog -Type Info -Message "Registry key propety already at desired value and key type, no changes needed."
+            }#EndIf: $UpdateItemProperty
+        }
+
+        $RegistrySubKey.Close()
+        $RegistryKey.close()
+
+    }
+    Function local:Remove-RegistryKey {
+        <#
+            .SYNOPSIS
+                Used to set remove key value.
+
+            .DESCRIPTION
+                Robust function used to remove a registry value with error handling and logging.
+            
+            .PARAMETER RegistryHive
+                [String] Used to determine the default state of the ribbon in explorer when tablet mode is off.
+                    HKEY_USERS            = 
+                    HKEY_CLASSES_ROOT     = 
+                    HKEY_CURRENT_CONFIG   = 
+                    HKEY_CURRENT_USER     = 
+                    HKEY_LOCAL_MACHINE    =
+
+            .PARAMETER Path
+                [String] Path of the registry key that the value will be removed.
+            
+            .PARAMETER Name
+                [String] Name of the key property.
+
+            .PARAMETER Confirm
+                [Int] Determine what type of changes should be prompted before executing.
+                    0 - Confirm both environment and object changes.
+                    1 - Confirm only object changes.
+                    2 - Confirm nothing! (Default)
+                    Object Changes are changes that are permanent such as file modifications, registry changes, etc.
+                    Environment changes are changes that can normally be restored via restart, such as opening/closing applications.
+
+            .INPUTS
+                None
+
+            .OUTPUTS
+                None
+
+            .NOTES
+            VERSION     DATE			NAME						DESCRIPTION
+	        ___________________________________________________________________________________________________________
+	        1.0         01 April 2021	Warilia, Nicholas R.		Initial version
+            
+        
+            Script tested on the following Powershell Versions
+                1.0   2.0   3.0   4.0   5.0   5.1 
+            ----- ----- ----- ----- ----- -----
+                X    X      X     X     ✓    ✓
+
+            Credits:
+                (1) Script Template: https://gist.github.com/9to5IT/9620683
+
+            To Do List:
+                (1) Get Powershell Path based on version (stock powershell, core, etc.)
+        #>
+        Param (
+            [Parameter(Mandatory=$True)]
+            [ValidateNotNullOrEmpty()]
+            [String]$Path,
+
+            [Parameter(Mandatory=$False)]
+            [ValidateNotNullOrEmpty()]
+            [String]$Name,
+
+            [Parameter(Mandatory=$True)]
+            [ValidateNotNullOrEmpty()]
+            [ValidateSet("HKEY_USERS","HKEY_CLASSES_ROOT","HKEY_CURRENT_CONFIG","HKEY_CURRENT_USER","HKEY_LOCAL_MACHINE")]
+            [String]$RegistryHive,
+
+            [ValidateSet(0,1,2)]
+            [Int]$Confim = 2
+        )
+
+        #This is custom entry to save several hundred lines of code throughout the script. If this function is used elsewhere it should be removed.
+        IF ([String]::IsNullOrWhiteSpace($Script:DefaultUserPath) -eq $False -AND $RegistryHive -eq "HKEY_CURRENT_USER") {
+            IF ($Script:TargetUser -eq "Both") {
+                Remove-RegistryKey -RegistryHive HKEY_LOCAL_MACHINE -Path "$Script:DefaultUserPath\$Path" -Name $Name -Confim $Confirm
+            } ElseIF ($Script:TargetUser -eq "DefaultUser") {
+                Set-Variable -Name RegistryHive -Value "HKEY_LOCAL_MACHINE" -Force -ErrorAction Stop -Verbose:$Verbose
+                Set-Variable -Name Path -Value "$DefaultUserPath\$Path" -Force -ErrorAction Stop -Verbose:$Verbose
+            }
+        }
 
         IF ($PSBoundParameters.ContainsKey('Verbose')) {
             Set-Variable -Name Verbose -Value $True
@@ -462,106 +782,43 @@ Function Start-SystemCustomizer {
 
         #Debug info to help with troubleshooting. Provides detailed variable information to better understand how the function was called.
         Write-nLog -Type Debug -Message "`$Path: $Path"
-        Write-nLog -Type Debug -Message "`$DataType: $DataType"
         Write-nLog -Type Debug -Message "`$Name: $Name"
-        Write-nLog -Type Debug -Message "`$Value: $Value"
         Write-nLog -Type Debug -Message "`$RegistryHive: $RegistryHive"
-        Write-nLog -Type Debug -Message "`$CreateKey: $CreateKey"
-        Write-nLog -Type Debug -Message "`$FixDataType: $FixDataType"
 
         #Create variables needed throughout function.
-        New-Variable -Name SetValue           -Value $False -Force -ErrorAction Stop -Verbose:$Verbose
         New-Variable -Name NewKey             -Value $False -Force -ErrorAction Stop -Verbose:$Verbose
-        New-Variable -Name SetItemProperty    -Value $False -Force -ErrorAction Stop -Verbose:$Verbose
-        New-Variable -Name UpdateItemProperty -Value $True  -Force -ErrorAction Stop -Verbose:$Verbose
-        New-Variable -Name DataTypeDB -Force -ErrorAction Stop -Verbose:$Verbose -Value @{
-            'REG_BINARY'    = "Binary"
-            'REG_DWORD'     = "DWord"
-            'REG_EXPAND_SZ' = "ExpandString"
-            'REG_MULTI_SZ'  = "MultiString"
-            'REG_SZ'        = "String"
-            'REG_QWORD'     = "Qword"
-            'REG_NONE'      = "Unknown"
-        }
 
         #Trim the path if needed.
         Set-Variable -Name Path -Value ($Path.Trim("\")) -Force -ErrorAction Stop -Verbose:$Verbose
 
         #Test if the path exists
-        If (Test-Path -Path Registry::$RegistryHive\$Path -PathType Container -Verbose:$Verbose) {
-            Set-Variable -Name SetValue -Value $True -Force -Verbose:$Verbose
-        } Else { #endIf: If the path doesn't exist, throw an error.
-            Write-nLog -Type Info -Message "Registry Key does not exist."
-            If ($CreateKey) {
-                Write-nLog -Type Debug -Message "Attempting to create registry key."
+        If (Test-Path -Path "Registry::$RegistryHive\$Path" -PathType Container -Verbose:$Verbose) {
+            Write-nLog -Type Debug -Message "Key does exist."
+            New-Variable -Name RegistryKey    -Value ([Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey($HiveTypeDB[$RegistryHive],$env:COMPUTERNAME)) -Force -Verbose:$Verbose
+            New-Variable -Name RegistrySubKey -Value ($RegistryKey.CreateSubKey($Path)) -Force -Verbose:$Verbose
+            IF ($RegistrySubKey.GetValueNames().Contains($Name) -EQ $True) {
+                Write-nLog -Type Debug -Message "Property '$Name' does exist."
                 Try {
-                    [Void](New-Item -Path Registry::$RegistryHive\$Path -ItemType Directory -ErrorAction Stop -Verbose:$Verbose -Confirm:$ConfirmChg)
-                    Write-nLog -Type Info -Message "Successfully created registry key."
-                    Set-Variable -Name SetValue -Value $True -Force -Verbose:$Verbose
-                    Set-Variable -Name NewKey   -Value $True -Force -Verbose:$Verbose
+                    $SubKey.DeleteValue($Name)
+                    Write-nLog -Type Info -Message "Successfully deleted 'Registry::$RegistryHive\$Path\$name'."
                 } Catch {
-                    Write-nLog -Type Error -Message "Unable to create registry key."
+                    Write-nLog -Type Error -Message "Unable to delete 'Registry::$RegistryHive\$Path\$name'."
                     $Global:SSCError = $Error[0]
+                    $RegistrySubKey.Close()
+                    $RegistryKey.close()
+                    return
                 }
-            } Else { #ElseIf: $CreateKey
-                
-            } #EndIf: $CreateKey
+            } Else { #ElseIf: ($RegistryKey.Property.contains("$Name") -EQ $True)
+                Write-nLog -Type Debug -Message "Property '$Name' does not exist."
+            } #EndIf: ($RegistryKey.Property.contains("$Name") -EQ $True)
+        } Else { #endIf
+            Write-nLog -Type Debug -Message "Registry key doesn't exist, no further action needed."
         }
 
-        If ($SetValue) {
-            IF ($NewKey -eq $False) {
-                Write-nLog -Type Debug -Message "Checking to see if registry property exists."
-                Set-Variable -Name RegistryKey -Value (Get-Item -Path "Registry::$RegistryHive\$Path") -Force -ErrorAction Stop -Verbose:$Verbose
-                IF ($RegistryKey.Property.contains("$Name") -EQ $True) {
-                    Set-Variable -Name SetItemProperty -Value $True -Force -ErrorAction Stop -Verbose:$Verbose
-                    IF ($RegistryKey.GetValueKind("$Name") -ne $DataTypeDB[$DataType]) {
-                        Write-nLog -Type Info -Message "Registry property type is '$($RegistryKey.GetValueKind("$Name"))' but expected '$($DataTypeDB[$DataType])."
-                        If ($FixDataType) {
-                            Write-nLog -Type Debug -Message "Attempting to remove registry key property to change ItemType."
-                            Try {
-                                Remove-ItemProperty -Path "Registry::$RegistryHive\$Path" -Name "$Name" -Force -ErrorAction Stop -Verbose:$Verbose -Confirm:$ConfirmChg
-                                Write-nLog -Type Info -Message "Successfully removed 'Registry::$RegistryHive\$Path\$Name'."
-                                Set-Variable -Name SetItemProperty -Value $False -Force -ErrorAction Stop -Verbose:$Verbose
-                            } Catch {
-                                Write-nLog -Type Error -Message "Failed to remove 'Registry::$RegistryHive\$Path\$Name'."
-                            }
-                        } Else { #ElseIf: $FixDataType
-                            Write-nLog -Type Warning -Message "Registry property type is '$($RegistryKey.GetValueKind("$Name"))' but expected '$($DataTypeDB[$DataType])."
-                        } #EndIf: $FixDataType
-                    } Else {
-                        #Check to see if the current registry value is the same as the desired value
-                        IF ($RegistryKey.GetValue("$Name") -eq $Value) {
-                            Set-Variable -Name UpdateItemProperty -Value $False -Force -ErrorAction Stop -Verbose:$Verbose
-                        }
-                    }
-                } #EndIf
-            }
-
-            #If registry key already desired value, no changes needed.
-            if ($UpdateItemProperty) {
-                IF ($SetItemProperty) {
-                    Write-nLog -Type Debug -Message "Attempting to set item property value."
-                    Try {
-                        Set-ItemProperty -Path "Registry::$RegistryHive\$Path" -Name $Name -Value $Value -Force -Verbose:$Verbose -ErrorAction Stop -Confirm:$ConfirmChg
-                        Write-nLog -Type Info -Message "Successfully set '$RegistryHive\$Path\$Value' to '$Value'."
-                    } Catch {
-                        Write-nLog -Type Error -Message "Failed to set '$RegistryHive\$Path\$Value' to '$Value'."
-                    }
-                } Else {#ElseIf: SetItemProprty
-                    Write-nLog -Type Debug -Message "Attempting to create item property and set value."
-                    Try {
-                        [Void](New-ItemProperty -Path "Registry::$RegistryHive\$Path" -Name $Name -Value $Value -PropertyType $DataTypeDB[$DataType] -Force -Verbose:$Verbose -ErrorAction Stop -Confirm:$ConfirmChg)
-                        Write-nLog -Type Info -Message "Successfully added '$RegistryHive\$Path\$Value' property and set value to '$Value'."
-                    } Catch {
-                        Write-nLog -Type Error -Message "Failed to set '$RegistryHive\$Path\$Value' to '$Value'."
-                    }
-                }#EndIf: $SetItemProperty
-            } Else {#ElseIf: $UpdateItemProperty
-                Write-nLog -Type Info -Message "Registry key propety already at desired value and key type, no changes needed."
-            }#EndIf: $UpdateItemProperty
-        }
+        $RegistrySubKey.Close()
+        $RegistryKey.close()
     }
-
+    
     #----------------------------------------------- [Initializations & Prerequisites] -----------------------------------------------
 
     #Determine the Log Output Level
@@ -665,27 +922,115 @@ Function Start-SystemCustomizer {
     #--------------------------------------------------------- [Main Script] ---------------------------------------------------------
     Write-nLog -Initialize -Type Debug -Message "Starting nLog function." -SetLogDir $ScriptEnv.ScriptDir -SetLogLevel $LogLevelInt -SetWriteHost $False -SetWriteLog $True -SetTimeLocalization Local -SetLogFormat CMTrace
     
-    Set-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Ribbon" -Name MinimizedStateTabletModeOff -DataType REG_DWORD -Value $MinimizedStateTabletModeOff
+    #Mount Default User Profile
+    If ($TargetUser-in @("DefaultUser","Both")) {
+        New-Variable -Name Process -Value ([System.Diagnostics.Process]::new()) -Force -ErrorAction Stop -Verbose:$Verbose
+        $Process.StartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $Process.StartInfo.Arguments = "LOAD HKLM\DEFAULT $Env:SystemDrive\Users\Default\NTUser.Dat"
+        $Process.StartInfo.FileName = "$Env:WinDir\System32\Reg.exe"
+        $Process.startinfo.WorkingDirectory = "$Env:WinDir\System32\"
+        $Process.StartInfo.UseShellExecute = $False
+        $Process.StartInfo.CreateNoWindow  = $True
+        $Process.StartInfo.RedirectStandardOutput = $True
+        $Process.StartInfo.RedirectStandardError = $False
+        $Process.StartInfo.RedirectStandardInput = $False
+        $Process.StartInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Normal
+        $Process.StartInfo.LoadUserProfile = $False
+        [Void]$Process.Start()
+        [Void]$Process.WaitForExit()
+        $Process.ExitCode
+        [Void]$Process.Dispose()
+        Remove-Variable -name Process -Force -ErrorAction Stop -Verbose:$Verbose
+        New-Variable -Name DefaultUserPath -Value "DEFAULT" -Force -ErrorAction Stop -Verbose:$Verbose
+    }
+
+    #MinimizedStateTabletModeOn
     Set-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Ribbon" -Name MinimizedStateTabletModeOn -DataType REG_DWORD -Value $MinimizedStateTabletModeOn
 
+    #MinimizedStateTabletModeOff
+    Set-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Ribbon" -Name MinimizedStateTabletModeOff -DataType REG_DWORD -Value $MinimizedStateTabletModeOff
+
     #Windows Feedback Frequency
-    if ($TargetUser -in @("CurrentUser","Both")) {
-        Switch ($WindowsFeedbackFrequency) {
-            "Automatically" {
-                Remove-ItemProperty -Path "Registry::HKEY_CURRENT_USER\Software\Microsoft\Siuf\Rules" -Name PeriodInNanoSeconds -Force
-                Get-ItemProperty -Path "Registry::HKEY_CURRENT_USER\Software\Microsoft\Siuf\Rules" -Name PeriodInNanoSeconds
-            }
-
+    Switch ($WindowsFeedbackFrequency) {
+        "Automatically" {
+            Remove-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "Software\Microsoft\Siuf\Rules" -Name PeriodInNanoSeconds
+            Remove-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "Software\Microsoft\Siuf\Rules" -Name NumberOfSIUFInPeriod
         }
-        Set-RegistryKey
-    } ElseIF ($TargetUser -in @("DefaultUser","Both")) {
-
+        "Never" {
+            Set-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "Software\Microsoft\Siuf\Rules" -Name PeriodInNanoSeconds -Value 0 -DataType REG_DWORD
+            Set-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "Software\Microsoft\Siuf\Rules" -Name NumberOfSIUFInPeriod -Value 0 -DataType REG_DWORD
+        }
+        "Always" {
+            Set-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "Software\Microsoft\Siuf\Rules" -Name 100000000 -Value 0 -DataType REG_DWORD
+            Remove-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "Software\Microsoft\Siuf\Rules" -Name NumberOfSIUFInPeriod
+        }
+        "Daily" {
+            Set-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "Software\Microsoft\Siuf\Rules" -Name PeriodInNanoSeconds -Value 864000000000 -DataType REG_DWORD
+            Set-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "Software\Microsoft\Siuf\Rules" -Name NumberOfSIUFInPeriod -Value 1 -DataType REG_DWORD
+        }
+        "Weekly" {
+            Set-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "Software\Microsoft\Siuf\Rules" -Name PeriodInNanoSeconds -Value 6048000000000 -DataType REG_DWORD
+            Set-RegistryKey -RegistryHive HKEY_CURRENT_USER -Path "Software\Microsoft\Siuf\Rules" -Name NumberOfSIUFInPeriod -Value 1 -DataType REG_DWORD
+        }
     }
 
     #DoNotShowFeedbackNotifications
     Set-RegistryKey -RegistryHive HKEY_LOCAL_MACHINE -Path "SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name DoNotShowFeedbackNotifications -Value $DoNotShowFeedbackNotifications -DataType REG_DWORD
     
+    #LetAppsActivateWithVoiceAllUsers
+    Set-RegistryKey -RegistryHive HKEY_LOCAL_MACHINE -Path "SOFTWARE\Policies\Microsoft\Windows\AppPrivacy" -Value $LetAppsActivateWithVoiceAllUsers -DataType REG_DWORD -Name LetAppsActivateWithVoice
 
+    #LetAppsActivateWithVoiceAboveLockAllUsers
+    Set-RegistryKey -RegistryHive HKEY_LOCAL_MACHINE -Path "SOFTWARE\Policies\Microsoft\Windows\AppPrivacy" -Value $LetAppsActivateWithVoiceAboveLockAllUsers -DataType REG_DWORD -Name LetAppsActivateWithVoiceAboveLock
+
+    #AllowCrossDeviceClipboard
+    IF ($AllowCrossDeviceClipboard -eq 1) {
+        Remove-RegistryKey -RegistryHive HKEY_LOCAL_MACHINE -Path "SOFTWARE\Policies\Microsoft\Windows\System" -Name AllowCrossDeviceClipboard
+    } Else {
+        Set-RegistryKey -RegistryHive HKEY_LOCAL_MACHINE -Path "SOFTWARE\Policies\Microsoft\Windows\System" -Value $AllowCrossDeviceClipboard -DataType REG_DWORD -Name AllowCrossDeviceClipboard
+    }
+
+    #OnlineSpeechRecognition
+    IF ($OnlineSpeechRecognition -eq 1) {
+        Remove-RegistryKey -RegistryHive HKEY_LOCAL_MACHINE -Path "SOFTWARE\Policies\Microsoft\InputPersonalization" -Name AllowInputPersonalization
+    } Else {
+        Set-RegistryKey -RegistryHive HKEY_LOCAL_MACHINE -Path "SOFTWARE\Policies\Microsoft\InputPersonalization" -Value $OnlineSpeechRecognition -DataType REG_DWORD -Name AllowInputPersonalization
+    }
+
+    #Flush out any unwritten/finalized registry edits so UserNT.dat can be safely unmounted.
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+
+    #Dismount Default User Profile
+    If ($TargetUser-in @("DefaultUser","Both")) {
+        New-Variable -Name Unloaded -Value $False -Force -ErrorAction Stop -Verbose:$Verbose
+        New-Variable -Name Attempts -Value ([Int]0) -Force -ErrorAction Stop -Verbose:$Verbose
+        While ($Unloaded -eq $False -AND $Attempts -lt 5) {
+            New-Variable -Name Process -Value ([System.Diagnostics.Process]::new()) -Force -ErrorAction Stop -Verbose:$Verbose
+            $Process.StartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+            $Process.StartInfo.Arguments = "UNLOAD HKLM\DEFAULT"
+            $Process.StartInfo.FileName = "$Env:WinDir\System32\Reg.exe"
+            $Process.startinfo.WorkingDirectory = "$Env:WinDir\System32\"
+            $Process.StartInfo.UseShellExecute = $False
+            $Process.StartInfo.CreateNoWindow  = $True
+            $Process.StartInfo.RedirectStandardOutput = $True
+            $Process.StartInfo.RedirectStandardError = $False
+            $Process.StartInfo.RedirectStandardInput = $False
+            $Process.StartInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Normal
+            $Process.StartInfo.LoadUserProfile = $False
+            [Void]$Process.Start()
+            [Void]$Process.WaitForExit()
+            If ($Process.ExitCode -eq 0) {
+                Set-Variable -Name Unloaded -Value $True -Force -ErrorAction Stop -Verbose:$Verbose
+            }
+            [Void]$Process.Dispose()
+            Remove-Variable -name Process -Force -ErrorAction Stop -Verbose:$Verbose
+        }
+    }
+
+    #LetAppsActivateWithVoiceAboveLockAllUsers
     Write-nLog -Close -Type Debug -Message "Closing nLog"
     #-------------------------------------------------------- [End of Script] --------------------------------------------------------
     Remove-Variable -Name @("ScriptConfig","ScriptEnv") -ErrorAction SilentlyContinue -Force -Verbose:$Verbose
