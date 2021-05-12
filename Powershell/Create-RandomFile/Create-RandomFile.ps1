@@ -24,16 +24,10 @@ Function Create-RandomStringv1 {
     $Dictionary = {$Dictionary}.Invoke()
 
     #Now that we have a functional dictionary to reference lets get to work creating randomness
-    New-Variable -Force -Name ByteArray    -Value ([System.Byte[]]::new(1024))
-    New-Variable -Force -Name StreamWriter -Value (New-Object -TypeName System.IO.Streamwriter -ArgumentList ("C:\Users\nwarila-admin\Desktop\TestFile.txt"),$False,([Text.Encoding]::UTF8),1024)
-    0..($size/1024) | & { Process {
-            $CryptoProvider.GetNonZeroBytes($ByteArray)
-            $Null = $Dictionary[$ResultBytes]
-            $StreamWriter.Write([char[]]$Dictionary[$ResultBytes])
-        }
-    }
-    
-    $sw = [io.file]::AppendText("C:\Users\nwarila-admin\Desktop\TestFile2.txt"); ForEach($x in 1..$ResultBytes.count) { $sw.WriteLine($s) } $sw.Close(); $sw.Dispose()
+    New-Variable -Force -Name ByteArray    -Value ([System.Byte[]]::new($Size))
+    New-Variable -Force -Name StreamWriter -Value (New-Object -TypeName System.IO.Streamwriter -ArgumentList ("D:\Desktop\TestFile.txt"),$False,([Text.Encoding]::UTF8))
+    $CryptoProvider.GetNonZeroBytes($ByteArray)
+    $StreamWriter.Write([char[]]$Dictionary[$ByteArray])
     $StreamWriter.Close()
     $StreamWriter.Dispose()
 }
@@ -92,4 +86,4 @@ Function Start-PerformanceTest {
             @{Name="Average";Expression={"$([Math]::Round($_.Average,3))$LengthType"}}
 }
 
-Start-PerformanceTest -ScriptBlock {Create-RandomStringv1 -Size (1024*1024)} -Iterations 1 -Measurement Seconds
+Start-PerformanceTest -ScriptBlock {Create-RandomStringv1 -Size (1024*1024*100)} -Iterations 1 -Measurement Seconds
