@@ -521,7 +521,7 @@ Function Update-ADUserNames {
             Write-nLog -Type:'Info' -Message:"New Name/Display Name: $($AttributeCheck.StringBuilder.ToString())"
             Write-nLog -Type:'Info' -Message:([String]::Empty).PadRight(100,'-')
             IF ($AuditAccounts -NE $True) {
-                #Set-ADUser -Identity $User.SID -Confirm:$ConfirmChg -PassThru |Rename-ADObject -NewName $User.DisplayName -Confirm:$ConfirmChg
+                Set-ADUser -Identity $User.SID -Confirm:$ConfirmChg -PassThru |Rename-ADObject -NewName $User.DisplayName -Confirm:$ConfirmChg
             }
         } Else {
             [Void]$Script.GoodAccounts.Add($AttributeCheck.StringBuilder.ToString())
@@ -536,4 +536,4 @@ Function Update-ADUserNames {
     #-------------------------------------------------------- [End of Script] --------------------------------------------------------
     Remove-Variable -Name @("Debuger","Verbose","IsAdministrator") -ErrorAction SilentlyContinue -Force -Verbose:$Verbose
 }
-Update-ADUserNames
+Update-ADUserNames -AuditAccounts
