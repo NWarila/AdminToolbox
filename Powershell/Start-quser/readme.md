@@ -41,3 +41,12 @@ Accepts a string list of computers and will run quser application against each o
     COMP-713V3TW nrwaril  console     1  Active 6/20/2020 2:17:00 PM        11328
     COMP-T217VT3 nrwaril  console     4  Active 5/11/2020 8:42:00 AM        69263
     UCFO-72T1VT3 nrwaril  console     8  Active 5/19/2020 9:46:00 AM        57679
+
+
+
+One Liner that does roughly the same thing about 30MS faster.
+
+    (quser) -replace '\s{2,}',',' -replace ">" | ConvertFrom-Csv |
+            Select-Object @{Name="Hostname";Expression={$env:Computername}},UserName,SessionName,ID,State,
+                            @{Name="LogonTime";Expression={[DateTime]$_."Logon Time"}},
+                            @{Name="TotalMinutes";Expression={[math]::Round((New-TimeSpan ([DateTime]$_."Logon Time") ($DateTime)).TotalMinutes)}}
