@@ -1,3 +1,4 @@
+
 PARAM(
     [Int]$PasswordLength            = 127,
     [Int]$MinUpperCase              = 5,
@@ -5,75 +6,122 @@ PARAM(
     [Int]$MinSpecialCharacters      = 5,
     [Int]$MinNumbers                = 5,
     [Int]$ConsecutiveCharClass      = 0,
-    [Int]$ConsecutiveCharCheckCount = 100,
+    [Int]$ConsecutiveCharCheckCount = 1000,
     [String]$LowerCase              = 'abcdefghiklmnoprstuvwxyz',
     [String]$UpperCase              = 'ABCDEFGHKLMNOPRSTUVWXYZ',
     [String]$Numbers                = '1234567890',
-    [String]$SpecialCharacters      = '!"$%&/()=?}][{@#*+'
+    [String]$SpecialCharacters      = '!"$%&/()=?}][{@#*+',
+    [String]$PasswordProfile        = '',
+
+    #Advanced Options
+    [Bool]$EnhancedEntrophy = $True
 )
 
-#Define default special characters
-New-Variable -Name CharacterClasses -Force -Value ([PSCustomObject]@{
-    LowerCase         = $LowerCase
-    UpperCase         = $UpperCase
-    Numbers           = $Numbers
-    SpecialCharacters = $SpecialCharacters
-    CombinedClasses   = $LowerCase,$UpperCase,$Numbers,$SpecialCharacters -join ''
+If ([String]::IsNullOrEmpty($PasswordProfile) -eq $False) {
+    #You can define custom password profiles here for easy reference later on.
+    New-Variable -Force -Name:'PasswordProfiles' -Value:@{
+        'iDrac' = [PSCustomObject]@{PasswordLength=20;SpecialCharacters="+&?>-}|.!(',_[`"@#)*;$]/§%=<:{@";}
+    }
+
+    If ($PasswordProfile -in $PasswordProfiles.Keys) {
+        $PasswordProfiles[$PasswordProfile] |Get-Member -MemberType NoteProperty |ForEach-Object {
+            Set-Variable -Name $_.name -Value $PasswordProfiles[$PasswordProfile].($_.name)
+        }
+    }
+}
+
+New-Variable -Force -Name:'PassBldr' -Value @{}
+New-Variable -Force -Name:'CharacterClass' -Value:([String]::Empty)
+ForEach ($CharacterClass in @("UpperCase","LowerCase","SpecialCharacters","Numbers")) {
+    $Characters = (Get-Variable -Name:$CharacterClass -ValueOnly)
+    If ($Characters.Length -gt 0) {
+        $PassBldr[$CharacterClass] = [PSCustomObject]@{
+            Min        = (Get-Variable -Name:"min$CharacterClass" -ValueOnly);
+            Characters = $Characters
+            Length     = $Characters.length
+        }
+    }
+}
+
+#Sanity Check(s)
+$MinimumChars = $MinUpperCase + $MinLowerCase + $MinSpecialCharacters + $MinNumbers
+If ($MinimumChars -gt $PasswordLength) {
+    Write-Error -Message:"Specified number of minimum characters ($MinimumChars) is greater than password length ($PasswordLength)."
+    Return
+}
+
+#New-Variable -Force -Name:'Random' -Value:(New-Object -TypeName:'System.Random')
+New-Variable -Force -Name:'Randomizer' -Value:$Null
+New-Variable -Force -Name:'Random' -Value:([ScriptBlock]::Create({
+    Param([Int]$Max=[Int32]::MaxValue,[Int32]$Min=1)
+    if ($Min -gt $Max) {
+        Write-Warning  "[$($myinvocation.ScriptLineNumber)] Min ($Min) must be less than Max ($Max)."
+        return -1
+    }
+
+    if ($EnhancedEntrophy) {
+        if ($Randomizer -eq $Null) {
+            Set-Variable -Name:'Randomizer' -Value:(New-Object -TypeName:'System.Security.Cryptography.RNGCryptoServiceProvider') -Scope:1
+        }
+        #initialize everything
+        $Difference=$Max-$Min
+        [Byte[]] $bytes = 1..4  #4 byte array for int32/uint32
+
+        #generate the number
+        $Randomizer.getbytes($bytes)
+        $Number = [System.BitConverter]::ToUInt32(($bytes),0)
+        return ([Int32]($Number % $Difference + $Min))
+
+    } Else {
+        if ($Randomizer -eq $Null) {
+            Set-Variable -Name:'Randomizer' -Value:(New-Object -TypeName:'System.Random') -Scope:1
+        }
+        return ([Int]$Randomizer.Next($Min,$Max))
+    }
+}))
+
+$GetString = [ScriptBlock]::Create({
+    Param([Int]$Length,[String]$Characters)
+    Return ([String]$Characters[(1..$Length |ForEach-Object {& $Random $Characters.length})] -replace " ","")
 })
 
 $CreatePassword = [scriptblock]::Create({
-    New-Variable -Name NewPassword -Value ([System.Text.StringBuilder]::new()) -Force
+    New-Variable -Name Password -Value ([System.Text.StringBuilder]::new()) -Force
 
     #Meet the minimum requirements for each character class
-    ForEach ($CharacterClass in @("MinUpperCase","MinLowerCase","MinSpecialCharacters","MinNumbers")) {
-        New-Variable -name Characters -Force -Value @{
-            Class = $CharacterClass.SubString(3) -As [String]
-            Characters = $CharacterClasses.($CharacterClass.SubString(3)) -As [String]
-            MinCharacters = (Get-Variable $CharacterClass -ValueOnly) -as [Int]
-        }
-        If (-Not [String]::IsNullOrEmpty($Characters.Characters)) {
-            If ($Characters.MinCharacters -gt 0) {
-                $Chars = 1..$($Characters.MinCharacters) | ForEach-Object {Get-Random -Maximum $Characters.Characters.length}
-                [void]$NewPassword.Append(([String]$Characters.Characters[$Chars] -replace " ",""))
-            }
+    ForEach ($CharacterClass in $PassBldr.Values) {
+        If ($CharacterClass.Min -gt 0) {
+            $Null = $Password.Append([string](Invoke-Command $GetString -ArgumentList $CharacterClass.Min,$CharacterClass.Characters))
         }
     }
 
     #Now meet the minimum length requirements.
-    $Chars = 1..($PasswordLength - $NewPassword.Length) |ForEach-Object {Get-Random -Maximum $CharacterClasses.CombinedClasses.length}
-    [void]$NewPassword.Append(([String]$CharacterClasses.CombinedClasses[$Chars] -replace " ",""))
+    If ([Int]($PasswordLength-$Password.length) -gt 0) {
+        $Null = $Password.Append((Invoke-Command $GetString -ArgumentList ($PasswordLength-$Password.length),($PassBldr.Values.Characters -join "")))
+    }
 
-    $FinalPassword = ([Char[]]$NewPassword.ToString() | Sort-Object {Get-Random}) -join ""
-    Return $FinalPassword
+    return (([Char[]]$Password.ToString() | Get-Random -Count $Password.Length) -join "")
 })
 
 Switch ([Int]$ConsecutiveCharClass) {
     '0' { New-Variable -Name NewPassword -Value (& $CreatePassword) -Force }
-    '1' { 
-        Write-Warning Testing
-        Write-Host test
-    }
-    {$_ -ge 2} {
-        New-Variable -Name CheckPass -Value $False -Force
-        New-Variable -Name CheckCount -Value ([Int]0) -Force
-        While ($CheckCount -lt $ConsecutiveCharCheckCount -AND $CheckPass -eq $False) {
+    {$_ -gt 0} {
+        New-Variable -Name CheckPass    -Value $False -Force
+        New-Variable -Name CheckCount   -Value ([Int]0) -Force
+        For ($I=0; $I -le $ConsecutiveCharCheckCount -and $CheckPass -eq $False; $I++) {
             New-Variable -Name NewPassword -Value (& $CreatePassword) -Force
-            ForEach ($CharacterClass in ("LowerCase","UpperCase","Numbers","SpecialCharacters")) {
-                IF (-Not [String]::IsNullOrEmpty($CharacterClasses.$CharacterClass)) {                      
-                    #The Actual Check
-                    if ($NewPassword -cmatch "([$([Regex]::Escape([char[]]($CharacterClasses.$CharacterClass) -join ","))]{$ConsecutiveCharClass,})" -eq $True) {
-                        $CheckCount++
-                        break
-                    }
-                    $CheckPass = $True
+            $TestPassed = 0
+            ForEach ($CharClass in $PassBldr.Values) {                   
+                IF ([Regex]::IsMatch([Regex]::Escape($NewPassword),"[$([Regex]::Escape($CharClass.Characters))]{$ConsecutiveCharClass}") -eq $False) {
+                    $TestPassed++
                 }
             }
-        }
-        If ($CheckPass -eq $False) {
-            Write-Warning -Message "Unable to find a password combination that meets ConsecutiveCharCheck requirements."
-            Remove-Variable -Name NewPassword -Force
+            if ($TestPassed -eq $CheckClasses.Count) {
+                $CheckPass = $True
+            }
         }
     }
     Default {Write-Warning -Message "This shouldn't be possible, how did you get here?!"}
 }
+
 Return $NewPassword
