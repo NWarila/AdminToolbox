@@ -237,7 +237,6 @@ Function Update-User {
         & $ApplyChanges
     }
 
-
     New-Variable -Name:'UpdateFlag' -Value:([scriptblock]::Create({
         Param ($Expression,$InitialFlags,$Action,$Flag)
 
@@ -329,29 +328,29 @@ New-Variable -Force -Name Win32CSQuery -Value @{
 
 New-Variable -Force -Name:'ComputerSystem' -Value:(Get-CimInstance @Win32CSQuery | Select-Object -Property:$Win32CSQuery.Property)
 
-#Add Computer Membership Property
-If ($ComputerSystem.PartOfDomain -eq $True) {
+# Only run if system is MemberWorkstation or MemberServer.
+If ($ComputerSystem.DomainRole -in @(1,3)) {
+
+    #Add Computer Membership Property
     $ComputerSystem |Add-Member -Force -MemberType NoteProperty -Name:'JoinedNetwork' -Value:($env:Userdomain)
-} Else {
-    $ComputerSystem |Add-Member -Force -MemberType NoteProperty -Name:'JoinedNetwork' -Value:($ComputerSystem.Workgroup)
-}
 
-# Get Local User Information
-New-Variable -Force -Name Win32UAQuery -Value @{
-    ClassName  = 'Win32_UserAccount';
-    NameSpace  = 'root/cimv2';
-    Property   = 'Status','Caption','PasswordExpires','Description','Name','Domain','LocalAccount','SID',
-                 'SIDType','AccountType','Disabled','FullName','Lockout','PasswordChangeable','PasswordRequired'
-    Filter     = "Domain = '$env:COMPUTERNAME'"
-    CimSession = $LocalCimSession
-}
-New-Variable -Force -Name:Users -Value:(Get-CimInstance @Win32UAQuery  | Select-Object -Property:$Win32UAQuery.Property)
+    # Get Local User Information
+    New-Variable -Force -Name Win32UAQuery -Value @{
+        ClassName  = 'Win32_UserAccount';
+        NameSpace  = 'root/cimv2';
+        Property   = 'Status','Caption','PasswordExpires','Description','Name','Domain','LocalAccount','SID',
+                     'SIDType','AccountType','Disabled','FullName','Lockout','PasswordChangeable','PasswordRequired'
+        Filter     = "Domain = '$env:COMPUTERNAME'"
+        CimSession = $LocalCimSession
+    }
+    New-Variable -Force -Name:Users -Value:(Get-CimInstance @Win32UAQuery  | Select-Object -Property:$Win32UAQuery.Property)
 
-# Harden the BuiltIn\Guest and BuiltIn\Administrator accounts.
-Update-User -sAMAccountName:($Users.Where({$_.sid -like "*-500"}).Name) -WorkgroupDomain:$($ComputerSystem.JoinedNetwork) -RemoveFlags '1','8','32','128','512','65536','131072','524288','2097152','4194304' -AddFlags:"2" -GeneratePassword
-Update-User -sAMAccountName:($Users.Where({$_.sid -like "*-501"}).Name) -WorkgroupDomain:$($ComputerSystem.JoinedNetwork) -RemoveFlags '1','8','32','64','128','512','65536','131072','524288','2097152','4194304' -AddFlags:'2' -GeneratePassword
+    # Harden the BuiltIn\Guest and BuiltIn\Administrator accounts.
+    Update-User -sAMAccountName:($Users.Where({$_.sid -like "*-500"}).Name) -WorkgroupDomain:$($ComputerSystem.JoinedNetwork) -RemoveFlags '1','8','32','128','512','65536','131072','524288','2097152','4194304' -AddFlags:"2" -GeneratePassword
+    Update-User -sAMAccountName:($Users.Where({$_.sid -like "*-501"}).Name) -WorkgroupDomain:$($ComputerSystem.JoinedNetwork) -RemoveFlags '1','8','32','64','128','512','65536','131072','524288','2097152','4194304' -AddFlags:'2' -GeneratePassword
 
-# If domain joined, create a proper local admin account.
-If ($ComputerSystem.PartOfDomain -eq $true) {
+    #Create and configure LocalAdmin
     Update-User -Username:("$($ComputerSystem.JoinedNetwork)Admin") -RemoveFlags '2','8','16','32','64','65536','262144','8388608' -CreateIfNot -AddGroups:'Administrators','Users'
+} Else {
+    Write-Verbose -Message:'System is not domain joined, exiting script.'
 }
