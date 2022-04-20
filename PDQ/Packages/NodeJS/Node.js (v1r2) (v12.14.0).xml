@@ -1,0 +1,367 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AdminArsenal.Export Code="PDQDeploy" Name="PDQ Deploy" Version="18.1.0.0" MinimumVersion="15.0">
+  <Package>
+    <CurrentLibraryPackageVersionId value="null" />
+    <PackageDefinition name="Definition">
+      <Conditions type="list">
+        <PackageStepCondition>
+          <Architecture>Both</Architecture>
+          <Version>All</Version>
+          <TypeName>OperatingSystem</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <IsUserLoggedOn>NoLoggedOnUser</IsUserLoggedOn>
+          <TypeName>LoggedOnUser</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <ConditionMode>None</ConditionMode>
+          <InventoryCollectionId value="null" />
+          <InventoryCollectionName></InventoryCollectionName>
+          <TypeName>Collection</TypeName>
+        </PackageStepCondition>
+      </Conditions>
+      <CopyMode>Default</CopyMode>
+      <DelayedApprovalTimeSpan>7.00:00:00</DelayedApprovalTimeSpan>
+      <DownloadApprovalMode>Manual</DownloadApprovalMode>
+      <InventoryScanProfileId value="null" />
+      <IsDownloadApprovalModeInherited value="true" />
+      <ScanAfterDeployment value="null" />
+      <Steps type="list">
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script># Update Me
+[Array]$Programs = @()
+
+[Array]$ProgramDirs = @(
+    "$Env:ProgramFiles\nodejs\"
+    "${Env:ProgramFiles(x86)}\nodejs\"
+)
+
+# Don't Edit Below this line
+###############################################################################################################################
+New-Variable -Name Processes -Value (Get-Process |Select Id,Path) -Description "List of all running processes." -Force
+New-Variable -Name Running1 -Value @{} -Description "List of all running applications that need to be killed." -Force
+New-Variable -Name Running2 -Value @{} -Description "List of all running applications that need to be killed." -Force
+
+IF (![string]::IsNullOrEmpty($ProgramDirs)) {
+    $Running1 = $Processes.path | Select-String -Pattern $ProgramDirs -SimpleMatch |Select -Unique
+}
+
+IF (![string]::IsNullOrEmpty($Programs)) {
+    $Running2 = $Processes.path | Select-String -Pattern $Programs -SimpleMatch |Select -Unique
+}
+Try {
+    ForEach ($Process in ($Running1,$Running2)) {
+            $Processes | Where {$_.path -eq $Process} |Stop-Process -Force
+    }
+    Exit 0
+} Catch {
+    $_.Exception
+    Exit 1
+}</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Stop Processes (v3)</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script># Update Me
+[String]$Search = "Node.JS"
+
+#Possible Options are: 'Regex','Simple',Exact'
+[String]$SearchType = 'Simple'
+
+#Possible options are "x86", "x64" and "both"
+[String]$Arch = 'both'
+
+# If uninstaller is an exe use these silent uninstall flags. If no flags should be added but still attempt exe uninstalls
+# using the ininstall string use 'none'
+[String]$EXEFlags = 'none'
+
+# Don't Edit Below this line
+###############################################################################################################################
+[Bool]$Debug = $False
+[Array]$Properties = @('DisplayName', 'DisplayVersion', 'ParentKey', 'UninstallString', 'AppArch')
+[System.Collections.ArrayList]$Keys = New-Object -TypeName 'System.Collections.ArrayList'
+[Void]$Keys.Add([PSObject]@{
+        'HKLM' = "Software\Microsoft\Windows\CurrentVersion\Uninstall"
+    })
+
+IF ([System.Environment]::Is64BitOperatingSystem) {
+    [Void]$Keys.Add([PSObject]@{
+            'HKLM' = "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+        })
+}
+[Array]$UserKeys = Get-ChildItem -Path Registry::HKEY_USERS
+FOREACH ($UserKey IN $UserKeys) {
+    [Void]$Keys.Add([PSObject]@{
+            'HKU' = "$UserKey\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+        })
+}
+
+[System.Collections.ArrayList]$Result = New-Object -TypeName 'System.Collections.ArrayList'
+FOREACH ($Key IN $Keys) {
+    SWITCH ($Key.Keys) {
+        'HKLM' {
+            $BaseKey = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $ENV:ComputerName)
+        }
+        'HKU'  {
+            $BaseKey = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::Users, $ENV:ComputerName)
+        }
+        Default {
+            Write-Error -Message "Invalid registry key root."
+            EXIT 1
+        }
+    }
+    $RegKey = $BaseKey.OpenSubkey($key.Values[0])
+    IF ($RegKey -ne $null) {
+        FOREACH ($subName IN $RegKey.getsubkeynames()) {
+            FOREACH ($sub IN $RegKey.opensubkey($subName)) {
+                [string]$Name = $sub.getvalue("displayname")
+                IF ($Name.trim().Length -gt 0) {
+                    
+                    #If search option selected and $Name doesn't match, move to next item
+                    IF (![string]::IsNullOrEmpty($Search) -AND (
+                            ($SearchType -eq 'Regex' -AND $Name -NotMatch $Search) -OR
+                            ($SearchType -eq 'Simple' -AND $Name -NOTLIKE "*$Search*") -OR
+                            ($SearchType -eq 'Exact' -AND $Name -NE $Search))
+                    ) {
+                        CONTINUE
+                    }
+                    
+                    $HashProperty = @{
+                    } #This should probably be; New-Object -TypeName 'System.Collections.ArrayList'
+                    FOREACH ($CurrentProperty IN $Properties) {
+                        SWITCH ($CurrentProperty) {
+                            "ParentKey" {
+                                $HashProperty.ParentKey = $subName
+                            }
+                            "AppArch" {
+                                IF ($Keys.Count -eq 2 -AND $Key -eq $Keys[0]) {
+                                    $HashProperty.AppArch = "x64"
+                                } ELSE {
+                                    $HashProperty.AppArch = "x86"
+                                }
+                            }
+                            Default {
+                                $HashProperty.$CurrentProperty = $sub.GetValue($CurrentProperty)
+                            }
+                        }
+                    } #End-ForEach
+                    $HashProperty.RegKey = $RegKey
+                    [Void]$Result.add([psCustomObject]$HashProperty)
+                } #End-IF
+            } #End-ForEach
+        } #End-Foreach
+    } #End-IF
+} #End-ForEach
+
+FOREACH ($App IN ($Result | Where-Object {
+            $_.AppArch -eq $Arch -OR $Arch -eq "Both"
+        })) {
+    IF ($App.UninstallString -match "msiexec") {
+        $ProcessStartInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $ProcessStartInfo.FileName = "$ENV:Windir\System32\msiexec.exe"
+        $ProcessStartInfo.Arguments = "/x $($App.ParentKey) /qn"
+        $ProcessStartInfo.CreateNoWindow = $True
+        $ProcessStartInfo.UseShellExecute = $False
+        $ProcessStartInfo.RedirectStandardOutput = $True
+        $ProcessStartInfo.RedirectStandardInput = $True
+        $ProcessStartInfo.RedirectStandardError = $True
+        $ProcessStartInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+        $ProcessStartInfo.LoadUserProfile = $False
+        IF ($Debug) {
+            Write-Output "Installing $($App.Name)"
+        } ELSE {
+            $Process = [System.Diagnostics.Process]::Start($ProcessStartInfo)
+            $Process.WaitForExit()
+        }
+        
+    } ELSEIF ($App.UninstallString -match ".exe") {
+        IF ([string]::IsNullOrEmpty($EXEFlags.Trim()) -AND $EXEFlags -ne "None") {
+            Write-Error -Message "EXE detected but no 'EXEFlags' have been configured. "
+        } Else {
+            $ProcessStartInfo = New-Object System.Diagnostics.ProcessStartInfo
+            $ProcessStartInfo.FileName = $App.UninstallString
+            $ProcessStartInfo.Arguments = $EXEFlags
+            $ProcessStartInfo.CreateNoWindow = $True
+            $ProcessStartInfo.UseShellExecute = $False
+            $ProcessStartInfo.RedirectStandardOutput = $True
+            $ProcessStartInfo.RedirectStandardInput = $True
+            $ProcessStartInfo.RedirectStandardError = $True
+            $ProcessStartInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+            $ProcessStartInfo.LoadUserProfile = $False
+            IF ($Debug) {
+                Write-Output "Debug: Installing $($App.DisplayName)"
+            } ELSE {
+                $Process = [System.Diagnostics.Process]::Start($ProcessStartInfo)
+                $Process.WaitForExit()
+            }
+        }
+    } ELSEIF([string]::IsNullOrEmpty($App.UninstallString))  {
+        Write-Output "Wing"
+    } Else {
+        Write-Output "Unable to handle these kinds of installers"
+        Write-Output $App.DisplayName
+    }
+}</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Bits64</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Uninstall (v3)</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+        <InstallStep>
+          <CustomCommandLine></CustomCommandLine>
+          <FileName>$(Repository)\NodeJS\NodeJS\12.14.0LTS\x86\node-v12.14.0-x32.msi</FileName>
+          <Files></Files>
+          <IncludeDirectory value="false" />
+          <LeaveInstallFile value="false" />
+          <MsiOperation>Install</MsiOperation>
+          <MsiQuiet value="true" />
+          <MsiRestart>Never</MsiRestart>
+          <Parameters></Parameters>
+          <SuccessCodes>0,1641,3010</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Bits32</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Install Application (32-Bit)</Title>
+          <TypeName>Install</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </InstallStep>
+        <InstallStep>
+          <CustomCommandLine></CustomCommandLine>
+          <FileName>$(Repository)\NodeJS\NodeJS\12.14.0LTS\x64\node-v12.14.0-x64.msi</FileName>
+          <Files></Files>
+          <IncludeDirectory value="false" />
+          <LeaveInstallFile value="false" />
+          <MsiOperation>Install</MsiOperation>
+          <MsiQuiet value="true" />
+          <MsiRestart>Never</MsiRestart>
+          <Parameters></Parameters>
+          <SuccessCodes>0,1641,3010</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Bits64</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Install Application (64-bit)</Title>
+          <TypeName>Install</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </InstallStep>
+      </Steps>
+      <Timeout value="60" />
+      <UseCustomTimeout value="false" />
+      <RunAs value="null" />
+    </PackageDefinition>
+    <Description>As an asynchronous event driven JavaScript runtime, Node.js is designed to build scalable network applications. In the following "hello world" example, many connections can be handled concurrently. Upon each connection the callback is fired, but if there is no work to be done, Node.js will sleep.
+
+Home Page
+ - https://nodejs.org/en/
+
+Installation Download
+ - https://nodejs.org/en/download/
+
+Installation Documentation
+ - 
+
+Other Useful Resources
+
+#=================================================================
+# Admin Notes
+#=================================================================
+To-Do List
+ -</Description>
+    <NewLibraryPackageVersionId value="null" />
+    <OriginalId value="null" />
+    <Version>10.16.3</Version>
+    <IsAutoDownload value="false" />
+    <FolderId value="6" />
+    <LibraryPackageVersionId value="null" />
+    <Name>Node.js (v1r2) (v12.14.0)</Name>
+    <Path>Packages\Installers\Node.js (v1r2) (v12.14.0)</Path>
+    <PackageDisplaySettings name="DisplaySettings">
+      <DisplayType>Normal</DisplayType>
+      <IconKey>Icon-Package</IconKey>
+      <SortOrder value="7" />
+    </PackageDisplaySettings>
+  </Package>
+</AdminArsenal.Export>

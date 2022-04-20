@@ -1,0 +1,347 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AdminArsenal.Export Code="PDQDeploy" Name="PDQ Deploy" Version="18.1.0.0" MinimumVersion="15.0">
+  <Package>
+    <CurrentLibraryPackageVersionId value="null" />
+    <PackageDefinition name="Definition">
+      <Conditions type="list">
+        <PackageStepCondition>
+          <Architecture>Both</Architecture>
+          <Version>All</Version>
+          <TypeName>OperatingSystem</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <IsUserLoggedOn>NoLoggedOnUser</IsUserLoggedOn>
+          <TypeName>LoggedOnUser</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <ConditionMode>None</ConditionMode>
+          <InventoryCollectionId value="null" />
+          <InventoryCollectionName></InventoryCollectionName>
+          <TypeName>Collection</TypeName>
+        </PackageStepCondition>
+      </Conditions>
+      <CopyMode>Default</CopyMode>
+      <DelayedApprovalTimeSpan>7.00:00:00</DelayedApprovalTimeSpan>
+      <DownloadApprovalMode>Manual</DownloadApprovalMode>
+      <InventoryScanProfileId value="null" />
+      <IsDownloadApprovalModeInherited value="true" />
+      <ScanAfterDeployment value="null" />
+      <Steps type="list">
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script># Update Me
+[Array]$Programs = @()
+
+[Array]$ProgramDirs = @(
+    "$Env:ProgramFiles\Apache Ant\"
+    "${Env:ProgramFiles(x86)}\Apache Ant\"
+)
+
+#Don't Edit Below this line
+###############################################################################################################################
+New-Variable -Name Processes -Value (Get-Process |Select Id,Path) -Description "List of all running processes." -Force
+New-Variable -Name Running1 -Value @{} -Description "List of all running applications that need to be killed." -Force
+New-Variable -Name Running2 -Value @{} -Description "List of all running applications that need to be killed." -Force
+
+IF (![string]::IsNullOrEmpty($ProgramDirs)) {
+    $Running1 = $Processes.path | Select-String -Pattern $ProgramDirs -SimpleMatch |Select -Unique
+}
+
+IF (![string]::IsNullOrEmpty($Programs)) {
+    $Running2 = $Processes.path | Select-String -Pattern $Programs -SimpleMatch |Select -Unique
+}
+
+ForEach ($Process in ($Running1,$Running2)) {
+     Try {
+          $Processes | Where {$_.path -eq $Process -and -not [string]::IsNullOrEmpty($_.Path)} |Stop-Process -Force -ErrorAction Stop
+     } Catch {
+          IF ($_.Exception -match "Cannot find a process with the process identifier") {
+               
+          } Else {
+               Write-Error -Message $_.Exception
+          }
+     }
+}</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Stop Processes (v3)</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script>#Required Options
+###############################################################################################################################
+$InstallerDir = "$(Repository)\Apache\Ant\1.10.7\"
+$AppName = 'Apache Ant'
+$AppPublisher = "Apache Software Foundation"
+$InstallIcon = "$(Repository)\Apache\Ant\Apache-Ant-Icon.ico"
+
+
+#Optional Options
+###############################################################################################################################
+#If InstallDir is left emp"
+$CustomDirName = ""
+
+
+###############################################################################################################################
+# Don't Edit Below this line
+###############################################################################################################################
+New-Variable -Name Script -Value @{} -Description "Main script variable used to store all script used variables" -Force
+$Script.Reg = @{}
+$Script.Reg.UninstallPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\"
+$Script.App = @{
+    Name = $AppName
+    RegPath = $Script.Reg.UninstallPath + $AppName
+    InstallerPath = $InstallerDir
+    Publisher = $AppPublisher
+}
+
+#Set application installation directory.
+If ($CustomDirName -Notmatch "^[a-zA-Z0-9\s]+$") {
+    Write-Output "CustomDirName is either empty or contains invalid characters. Reverting to default: $Env:ProgramFiles\$AppName\"
+    $Script.App.InstallDir = "$Env:ProgramFiles\$AppName\"
+} Else {
+    $Script.App.InstallDir = $CustomDirName
+}
+
+#Ensure application installation directory is formatted properly.
+If ($Script.App.InstallDir[($Script.App.InstallDir.Length-1)] -ne "\") {
+    $Script.App.InstallDir = $Script.App.InstallDir + "\"
+}
+$Script.App.RegInstallDir = $Script.App.InstallDir.Replace("\","\\")
+
+#Set uninstall string
+$Script.App.UninstallString = $Script.App.InstallDir + "Uninstall.bat"
+
+#Ensure we have some sort of valid ico file set, even if we have to make one up.
+If (!(Test-Path -LiteralPath $InstallIcon) -OR (Get-Item $InstallIcon -ErrorAction SilentlyContinue).PSIsContainer) {
+    Write-Error "Unable to locate icon file." -Category ObjectNotFound -RecommendedAction 'Update $InstallIcon file path'
+    [Bool]$Script.App.CopyIcon = $False
+} Else {
+    [Bool]$Script.App.CopyIcon = $True
+    $Script.App.InstallIcon = $InstallIcon
+}
+$Script.App.Icon = $Script.App.InstallDir + "icon.ico"
+
+$Script.App.UninstallScript = @"
+@ECHO OFF
+CD %SystemDrive%
+REG DELETE "$($Script.App.RegPath.replace("HKLM:","HKLM"))" /f
+RMDIR "$($Script.App.InstallDir)" /S /Q
+ECHO/ Script Complete
+pause
+exit
+"@
+
+If (Test-Path -LiteralPath $Script.App.InstallerPath) {
+    Write-Output "Checking for previous installation."
+    If ((Get-ChildItem -LiteralPath $Script.app.InstallDir -Recurse -File -ErrorAction SilentlyContinue).count -GT 0 -OR (Test-Path -LiteralPath $Script.App.RegPath)) {
+        Try {
+            Write-Output "Previous Installation Detected. Attempting to uninstall."
+                Remove-item -LiteralPath $Script.App.InstallDir -Recurse -Force -ErrorAction Stop
+                Remove-Item -LiteralPath $Script.App.RegPath-Force -ErrorAction Stop
+        } Catch {
+            Write-Error $_.Exception
+            Exit 1
+        }
+    }
+
+    Write-Output "Starting Installation."
+    Try {
+        Write-Output "Getting required information for installation."
+            $Script.App.Version = Split-Path -Path $Script.App.InstallerPath -Leaf
+            $Script.App.InstallSize = [math]::Round(((Get-ChildItem -Path $Script.App.InstallerPath -Recurse | Measure-Object -Property Length -Sum -ErrorAction Stop).Sum / 1KB))
+        Write-Output "Copying installation files to destination computer."
+            Copy-Item -Path $Script.App.InstallerPath -Destination $Script.App.InstallDir -Include *.* -Container -Recurse -Force -ErrorAction Stop
+            If ($Script.App.CopyIcon) {
+                Copy-Item -Path $Script.App.InstallIcon -Destination $Script.App.Icon -Container -Force -ErrorAction Continue
+            }
+        Write-Output "Creating Program &amp; Features Entry"
+            $Null = New-Item -Path $Script.Reg.UninstallPath -Name $Script.App.Name -Force -ErrorAction Stop
+            $Null = New-ItemProperty -Path $Script.App.RegPath -Name 'DisplayName' -Value "$AppName (v$($Script.App.Version))" -PropertyType "String" -Force -ErrorAction Stop
+            $Null = New-ItemProperty -Path $Script.App.RegPath -Name 'DisplayVersion' -Value $Script.App.Version -PropertyType "String" -Force -ErrorAction Stop
+            $Null = New-ItemProperty -Path $Script.App.RegPath -Name 'DisplayIcon' -Value $Script.App.Icon -PropertyType "String" -Force -ErrorAction Stop
+            $Null = New-ItemProperty -Path $Script.App.RegPath -Name 'InstallLocation' -Value $Script.App.InstallDir -PropertyType "String" -Force -ErrorAction Stop
+            $Null = New-ItemProperty -Path $Script.App.RegPath -Name 'UninstallString' -Value $Script.App.UninstallString -PropertyType "String" -Force -ErrorAction Stop
+            $Null = New-ItemProperty -Path $Script.App.RegPath -Name 'NoModify' -Value 1 -PropertyType "dword" -Force -ErrorAction Stop
+            $Null = New-ItemProperty -Path $Script.App.RegPath -Name 'NoRepair' -Value 1 -PropertyType "dword" -Force -ErrorAction Stop
+            $Null = New-ItemProperty -Path $Script.App.RegPath -Name 'Publisher' -Value $Script.App.Publisher -PropertyType "String" -Force -ErrorAction Stop
+            $Null = New-ItemProperty -Path $Script.App.RegPath -Name 'EstimatedSize' -Value $Script.App.InstallSize -PropertyType "dword" -Force -ErrorAction Stop
+        Write-Output "Generating Uninstall.bat"
+            Out-File -FilePath $Script.App.UninstallString -InputObject $Script.App.UninstallScript -Force -Encoding ascii
+        Write-Output "Script Complete"
+            Exit 0
+    } Catch {
+        Write-Error $_.Exception
+    }
+} Else {
+    Write-Error "Unable to locate installer directory."
+    Exit 1
+}</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Install Application (v2)</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script># Update Me
+[String]$Search = "Apache Ant"
+[String]$VariableName = "ANT_HOME"
+
+# Don't Edit Below this line
+###############################################################################################################################
+$Search = [regex]::Escape($Search)
+[Version]$LatestInstalled=$Null
+[Array]$Properties = @('DisplayName','DisplayVersion','ParentKey','UninstallString','AppArch','InstallLocation')
+[Array]$Keys = "Software\Microsoft\Windows\CurrentVersion\Uninstall"
+If ([System.Environment]::Is64BitOperatingSystem) {
+    $Keys += "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+}
+$Result = New-Object -TypeName 'System.Collections.ArrayList'
+$BaseKey = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine,$ENV:ComputerName)
+ForEach($Key in $Keys) {
+    $RegKey = $BaseKey.OpenSubkey($key)
+    If ($RegKey -ne $null) {
+        ForEach($subName in $RegKey.getsubkeynames()) {
+            foreach($sub in $RegKey.opensubkey($subName)) {
+            [string]$Name = $sub.getvalue("displayname")
+                If ($Name.trim().Length -gt 0) {
+                    #If search option selected and $Name doesn't match, move to next item
+                    If (($Search -AND -NOT ($Name -match $Search -OR $Name -EQ $Search)) -OR ($KB -AND $Name -Notmatch "KB")) { Continue }
+                    $HashProperty = @{} #This should probably be; New-Object -TypeName 'System.Collections.ArrayList'
+                    ForEach ($CurrentProperty in $Properties) {
+                        Switch ($CurrentProperty) {
+                            "ParentKey" {$HashProperty.ParentKey = $subName}
+                            "AppArch" {
+                                If ($Keys.Count -eq 2 -AND $Key -eq $Keys[0]) {
+                                    $HashProperty.AppArch = "x64"
+                                } Else {
+                                    $HashProperty.AppArch = "x86"
+                                }
+                            }
+                            Default {$HashProperty.$CurrentProperty = $sub.GetValue($CurrentProperty)}
+                        }
+                    }#End-ForEach
+                    $Null = $Result.add([psCustomObject]$HashProperty)
+                }#End-IF
+            }#End-ForEach
+        }#End-Foreach
+    }#End-IF
+}#End-ForEach
+
+If ($Result.count -eq 1) {
+    Try {
+        [Environment]::SetEnvironmentVariable($VariableName,$Result.InstallLocation,"Machine")
+        Exit 0
+    } Catch {
+        Exit 1
+    }
+}</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Set Environment Variables (v1)</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+      </Steps>
+      <Timeout value="60" />
+      <UseCustomTimeout value="false" />
+      <RunAs value="null" />
+    </PackageDefinition>
+    <Description>Apache Ant is a Java library and command-line tool whose mission is to drive processes described in build files as targets and extension points dependent upon each other. The main known usage of Ant is the build of Java applications. Ant supplies a number of built-in tasks allowing to compile, assemble, test and run Java applications. Ant can also be used effectively to build non Java applications, for instance C or C++ applications. More generally, Ant can be used to pilot any type of process which can be described in terms of targets and tasks.
+
+Home Page
+ - https://ant.apache.org/
+
+Installation Download
+ - https://ant.apache.org/bindownload.cgi
+
+Installation Documentation
+ - 
+
+Other Useful Resources
+
+#=================================================================
+# Admin Notes
+#=================================================================</Description>
+    <NewLibraryPackageVersionId value="null" />
+    <OriginalId value="null" />
+    <Version>1.10.7</Version>
+    <IsAutoDownload value="false" />
+    <FolderId value="6" />
+    <LibraryPackageVersionId value="null" />
+    <Name>Apache Ant (v1r1) (v1.10.7)</Name>
+    <Path>Packages\Installers\Apache Ant (v1r1) (v1.10.7)</Path>
+    <PackageDisplaySettings name="DisplaySettings">
+      <DisplayType>Normal</DisplayType>
+      <IconKey>Icon-Package</IconKey>
+      <SortOrder value="7" />
+    </PackageDisplaySettings>
+  </Package>
+</AdminArsenal.Export>

@@ -1,0 +1,92 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AdminArsenal.Export Code="PDQInventory" Name="PDQ Inventory" Version="18.1.0.0" MinimumVersion="4.0">
+  <Collection>
+    <ReportDefinition name="Definition">
+      <RootFilter name="Filter">
+        <Comparison>All</Comparison>
+        <Filters type="list">
+          <ValueFilter>
+            <Table>ADComputerGroupComputers</Table>
+            <TableTitle>Member of AD Group</TableTitle>
+            <Column>Name</Column>
+            <Comparison>Equals</Comparison>
+            <Value>UCMS_App-7zip_Install</Value>
+          </ValueFilter>
+          <ValueFilter>
+            <Table>Computer</Table>
+            <Column>NeverScanned</Column>
+            <Comparison>!IsTrue</Comparison>
+          </ValueFilter>
+          <ValueFilter>
+            <Table>Computer</Table>
+            <Column>ADIsDisabled</Column>
+            <Comparison>Is</Comparison>
+            <Value>Enabled</Value>
+          </ValueFilter>
+          <ValueFilter>
+            <Table>Computer</Table>
+            <Column>SuccessfulScanDate</Column>
+            <Comparison>After</Comparison>
+            <Value>30 days ago</Value>
+          </ValueFilter>
+          <GroupFilter>
+            <Comparison>Any</Comparison>
+            <Filters type="list">
+              <GroupFilter>
+                <Comparison>All</Comparison>
+                <Filters type="list">
+                  <ValueFilter>
+                    <Table>Application</Table>
+                    <Column>Name</Column>
+                    <Comparison>Contains</Comparison>
+                    <Value>7-ZIP</Value>
+                  </ValueFilter>
+                  <ValueFilter>
+                    <Table>Application</Table>
+                    <Column>Version</Column>
+                    <Comparison>VersionLowerThan</Comparison>
+                    <Value>19.00</Value>
+                  </ValueFilter>
+                </Filters>
+              </GroupFilter>
+              <GroupFilter>
+                <Comparison>NotAny</Comparison>
+                <Filters type="list">
+                  <ValueFilter>
+                    <Table>Application</Table>
+                    <Column>Name</Column>
+                    <Comparison>Contains</Comparison>
+                    <Value>7-ZIP</Value>
+                  </ValueFilter>
+                </Filters>
+              </GroupFilter>
+            </Filters>
+          </GroupFilter>
+        </Filters>
+      </RootFilter>
+      <ReportDefinitionTypeName>BasicReportDefinition</ReportDefinitionTypeName>
+      <Columns type="list">
+        <Column>
+          <Column>ComputerId</Column>
+          <Summary></Summary>
+          <Table>Computer</Table>
+          <Title></Title>
+        </Column>
+      </Columns>
+    </ReportDefinition>
+    <IsDrilldown value="false" />
+    <ImportedPath></ImportedPath>
+    <TypeName>DynamicCollection</TypeName>
+    <Created>2019-08-16T10:13:48.0000000-04:00</Created>
+    <Description></Description>
+    <Error></Error>
+    <Id value="1036" />
+    <IsEnabled value="true" />
+    <Modified>2019-08-18T14:23:54.0000000-04:00</Modified>
+    <Name>UCMS_App-7zip_Install</Name>
+    <ParentId value="1047" />
+    <Path>Managed Applications\UCMS_App-7zip_Install</Path>
+    <Type>DynamicCollection</Type>
+    <Children type="list" />
+  </Collection>
+</AdminArsenal.Export>

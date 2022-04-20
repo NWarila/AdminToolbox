@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AdminArsenal.Export Code="PDQInventory" Name="PDQ Inventory" Version="18.1.0.0" MinimumVersion="4.0">
+  <Collection>
+    <ReportDefinition name="Definition">
+      <RootFilter name="Filter">
+        <Comparison>All</Comparison>
+        <Filters type="list">
+          <ValueFilter>
+            <Table>ADComputerGroupComputers</Table>
+            <TableTitle>Member of AD Group</TableTitle>
+            <Column>Name</Column>
+            <Comparison>Equals</Comparison>
+            <Value>UCMS_App-MSProject16_Install</Value>
+          </ValueFilter>
+          <ValueFilter>
+            <Table>Computer</Table>
+            <Column>NeverScanned</Column>
+            <Comparison>!IsTrue</Comparison>
+          </ValueFilter>
+          <GroupFilter>
+            <Comparison>NotAny</Comparison>
+            <Filters type="list">
+              <ValueFilter>
+                <Table>Application</Table>
+                <Column>Name</Column>
+                <Comparison>Contains</Comparison>
+                <Value>Microsoft Project Standard 2016</Value>
+              </ValueFilter>
+            </Filters>
+          </GroupFilter>
+          <ValueFilter>
+            <Table>Computer</Table>
+            <Column>SuccessfulScanDate</Column>
+            <Comparison>After</Comparison>
+            <Value>30 days ago</Value>
+          </ValueFilter>
+          <ValueFilter>
+            <Table>Computer</Table>
+            <Column>ADIsDisabled</Column>
+            <Comparison>Is</Comparison>
+            <Value>Enabled</Value>
+          </ValueFilter>
+        </Filters>
+      </RootFilter>
+      <ReportDefinitionTypeName>BasicReportDefinition</ReportDefinitionTypeName>
+      <Columns type="list">
+        <Column>
+          <Column>ComputerId</Column>
+          <Summary></Summary>
+          <Table>Computer</Table>
+          <Title></Title>
+        </Column>
+      </Columns>
+    </ReportDefinition>
+    <IsDrilldown value="false" />
+    <ImportedPath></ImportedPath>
+    <TypeName>DynamicCollection</TypeName>
+    <Created>2019-08-22T14:21:36.0000000-04:00</Created>
+    <Description></Description>
+    <Error></Error>
+    <Id value="1057" />
+    <IsEnabled value="true" />
+    <Modified>2019-08-22T14:23:14.0000000-04:00</Modified>
+    <Name>UCMS_App-MSProject16_Install</Name>
+    <ParentId value="1047" />
+    <Path>Managed Applications\UCMS_App-MSProject16_Install</Path>
+    <Type>DynamicCollection</Type>
+    <Children type="list" />
+  </Collection>
+</AdminArsenal.Export>
