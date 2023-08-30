@@ -1,25 +1,25 @@
-<# :# PowerShell comment protecting the Batch section
+<# PowerShell comment protecting the Batch section
 @echo off
 
-:# Clear console to supress any errors.
+:# Clear the console to suppress any errors.
 cls
 
 :# Disabling argument expansion avoids issues with ! in arguments.
 SetLocal EnableExtensions DisableDelayedExpansion
 
-:# Checking for Administrator Privilages.
+:# Checking for Administrator Privileges.
 net session >nul 2>&1
 IF NOT %ErrorLevel% == 0 (
-    ECHO. Failure: Current permissions inadequate.
+    ECHO. Failure: Current permissions are inadequate.
     EXIT /B 1
 )
 
-:# Prepare the batch arguments, so that PowerShell parses them correctly
+:# Prepare the batch arguments so that PowerShell parses them correctly
 SET ARGS=%*
 IF defined ARGS set ARGS=%ARGS:"=\"%
 IF defined ARGS set ARGS=%ARGS:'=''%
 
-:# Ensure path is utilizing a lettered drive path.
+:# Ensure FilePath is utilizing a lettered drive path.
 SET "FilePath=%~f0"
 IF "%FilePath:~0,2%" == "\\" PUSHD "%~dp0"
 IF "%FilePath:~0,2%" == "\\" SET "FilePath=%CD%\%~nx0"
@@ -40,7 +40,7 @@ SET "FilePath=%FilePath:&=^&%"
 :# to pass a " to PS by entering two "" in the bat args.                                                        #:
 :# ============================================================================================================ #:
 ECHO In BATCH; Entering PowerShell.
-"%WinDir%\System32\WindowsPowerShell\v1.0\powershell.exe" -c ^
+"%WinDir%\System32\WindowsPowerShell\v1.0\powershell.exe" -NonInteractive -NoLogo -NoProfile -Command ^
     ^"Invoke-Expression ('^& {' + (get-content -raw '%FilePath%') + '} %ARGS%')"
 ECHO Exited PowerShell; Back in BATCH.
 
