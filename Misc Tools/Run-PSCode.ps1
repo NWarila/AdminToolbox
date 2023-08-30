@@ -7,6 +7,13 @@ cls
 :# Disabling argument expansion avoids issues with ! in arguments.
 SetLocal EnableExtensions DisableDelayedExpansion
 
+:# Checking for Administrator Privilages.
+net session >nul 2>&1
+IF NOT %ErrorLevel% == 0 (
+    ECHO. Failure: Current permissions inadequate.
+    EXIT /B 1
+)
+
 :# Prepare the batch arguments, so that PowerShell parses them correctly
 SET ARGS=%*
 IF defined ARGS set ARGS=%ARGS:"=\"%
@@ -15,7 +22,8 @@ IF defined ARGS set ARGS=%ARGS:'=''%
 :# Ensure path is utilizing a lettered drive path.
 SET "FilePath=%~f0"
 IF "%FilePath:~0,2%" == "\\" PUSHD "%~dp0"
-SET "FilePath=%CD%\%~nx0"
+IF "%FilePath:~0,2%" == "\\" SET "FilePath=%CD%\%~nx0"
+IF NOT "%FilePath:~0,2%" == "\\" CD "%~dp0"
 
 :# Escape the file path for all possible invalid characters.
 SET "FilePath=%FilePath:'=''%"
@@ -36,14 +44,9 @@ ECHO In BATCH; Entering PowerShell.
     ^"Invoke-Expression ('^& {' + (get-content -raw '%FilePath%') + '} %ARGS%')"
 ECHO Exited PowerShell; Back in BATCH.
 
-
 pause
 POPD
 exit /b
 
 ###############################################################################
 End of the PS comment around the Batch section; Begin the PowerShell section #>
-
-echo "In PowerShell"
-$Args | % { "PowerShell Args[{0}] = '$_'" -f $i++ }
-exit 0
