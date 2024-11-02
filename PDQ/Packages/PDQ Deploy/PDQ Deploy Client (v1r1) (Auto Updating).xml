@@ -1,0 +1,192 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AdminArsenal.Export Code="PDQDeploy" Name="PDQ Deploy" Version="18.1.0.0" MinimumVersion="15.0">
+  <Package>
+    <CurrentLibraryPackageVersionId value="null" />
+    <PackageDefinition name="Definition">
+      <Conditions type="list">
+        <PackageStepCondition>
+          <Architecture>Both</Architecture>
+          <Version>All</Version>
+          <TypeName>OperatingSystem</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <IsUserLoggedOn>NoLoggedOnUser</IsUserLoggedOn>
+          <TypeName>LoggedOnUser</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <ConditionMode>None</ConditionMode>
+          <InventoryCollectionId value="null" />
+          <InventoryCollectionName></InventoryCollectionName>
+          <TypeName>Collection</TypeName>
+        </PackageStepCondition>
+      </Conditions>
+      <CopyMode>Default</CopyMode>
+      <DelayedApprovalTimeSpan>7.00:00:00</DelayedApprovalTimeSpan>
+      <DownloadApprovalMode>Manual</DownloadApprovalMode>
+      <InventoryScanProfileId value="null" />
+      <IsDownloadApprovalModeInherited value="true" />
+      <ScanAfterDeployment value="null" />
+      <Steps type="list">
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script># Update Me
+[Array]$Programs = @(
+    "PDQDeployConsole.exe"
+)
+[Array]$ProgramDirs = @(
+    "$Env:ProgramFiles\Admin Arsenal\PDQ Deploy\"
+    "${Env:ProgramFiles(x86)}\Admin Arsenal\PDQ Deploy\"
+)
+
+#Don't Edit Below this line
+###############################################################################################################################
+New-Variable -Name Processes -Value (Get-Process |Select Id,Path) -Description "List of all running processes." -Force
+New-Variable -Name Running1 -Value @{} -Description "List of all running applications that need to be killed." -Force
+New-Variable -Name Running2 -Value @{} -Description "List of all running applications that need to be killed." -Force
+
+IF (![string]::IsNullOrEmpty($ProgramDirs)) {
+    $Running1 = $Processes.path | Select-String -Pattern $ProgramDirs -SimpleMatch |Select -Unique
+}
+
+IF (![string]::IsNullOrEmpty($Programs)) {
+    $Running2 = $Processes.path | Select-String -Pattern $Programs -SimpleMatch |Select -Unique
+}
+
+ForEach ($Process in ($Running1,$Running2)) {
+     Try {
+          $Processes | Where {$_.path -eq $Process -and -not [string]::IsNullOrEmpty($_.Path)} |Stop-Process -Force -ErrorAction Stop
+     } Catch {
+          IF ($_.Exception -match "Cannot find a process with the process identifier") {
+               
+          } Else {
+               Write-Error -Message $_.Exception
+          }
+     }
+}</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>Continue</ErrorMode>
+          <Title>Stop Processes (v3)</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+        <InstallStep>
+          <CustomCommandLine></CustomCommandLine>
+          <FileName>%WINDIR%\Downloaded Installations\Admin Arsenal\PDQ Deploy\$(PDQDeployVersion)\PDQDeploy.msi</FileName>
+          <Files></Files>
+          <IncludeDirectory value="false" />
+          <LeaveInstallFile value="false" />
+          <MsiOperation>Install</MsiOperation>
+          <MsiQuiet value="true" />
+          <MsiRestart>Never</MsiRestart>
+          <Parameters></Parameters>
+          <SuccessCodes>0,1641,3010,2359302</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Install Deploy Client</Title>
+          <TypeName>Install</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </InstallStep>
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script>$Product    = "PDQ Deploy"
+$License = @"
+--- START LICENSE ---PExpY2Vuc2UgVmVyc2lvbj0iMi4wIiBJRD0iNzkxYWE0NDYtMzVlMi00OGI2LWEyMGUtMmY0OGNhOGYzMWIzIiBDdXN0b21lcklEPSI3MzdkNDU1Yi0xMTk1LTRiNTAtYWU0Yy0yNTBjYWRhNWYyZDUiIE5hbWU9IlBEUSBEZXBsb3kiIENvZGU9IlBEUURlcGxveSIgQ291bnQ9IjIiIE1vZGU9IkVudGVycHJpc2UiIFR5cGU9IkZ1bGwiIEUtTWFpbD0iYnNjYW5ub25Abi1hc2suY29tIiBFeHBpcmVzPSIyMDIwLTAyLTI1IiBTaWduYXR1cmU9ImRlaGFweTZGNFlrU2Fna2QxeXFrSEIzYWo1Nk5BOU5HaXNHdzc5N0NKbEFFUVhDbEprb1UvYTFpRUo4MnM3bWVURGpHVVl3amFUV213V1RsNG0yWmRxWjRGRmNKMGxsM2l6S2x5TmJIWHM1ZkhwVGVrRk8zZTQ4dTRtQTlJSHpTeU9ybHJ5SzRRZGdDTU5PUTVKQVVEcUY4OXdsckVTcFRaQXViSW5sQUNKcz0iIC8+--- END LICENSE ---
+"@
+
+New-Item -Force -Path "HKLM:\SOFTWARE\Admin Arsenal"          -Name "$Product" -ErrorAction SilentlyContinue | Out-Null
+New-Item -Force -Path "HKLM:\SOFTWARE\Admin Arsenal\$Product" -Name "Protocol" -ErrorAction SilentlyContinue | Out-Null
+
+Start-Sleep -Seconds 5
+
+New-ItemProperty -Force -Path "HKLM:\SOFTWARE\Admin Arsenal\$Product"          -Name "License"        -PropertyType "String" -Value "$License"    | Out-Null
+New-ItemProperty -Force -Path "HKLM:\SOFTWARE\Admin Arsenal\$Product\Protocol" -Name "Mode"           -PropertyType "String" -Value "Client"      | Out-Null
+New-ItemProperty -Force -Path "HKLM:\SOFTWARE\Admin Arsenal\$Product\Protocol" -Name "ServerHostName" -PropertyType "String" -Value "$(PDQDeployServerHostName)" | Out-Null
+New-ItemProperty -Force -Path "HKLM:\SOFTWARE\Admin Arsenal\$Product\Protocol" -Name "ServerPort"     -PropertyType "Dword"  -Value "$(PDQDeployServerPort)" | Out-Null</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Set registry values</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+      </Steps>
+      <Timeout value="60" />
+      <UseCustomTimeout value="false" />
+      <RunAs value="null" />
+    </PackageDefinition>
+    <Description></Description>
+    <NewLibraryPackageVersionId value="null" />
+    <OriginalId value="null" />
+    <Version></Version>
+    <IsAutoDownload value="false" />
+    <FolderId value="6" />
+    <LibraryPackageVersionId value="null" />
+    <Name>PDQ Deploy Client (v1r1) (Auto Updating)</Name>
+    <Path>Packages\Installers\PDQ Deploy Client (v1r1) (Auto Updating)</Path>
+    <PackageDisplaySettings name="DisplaySettings">
+      <DisplayType>Normal</DisplayType>
+      <IconKey>Icon-Package</IconKey>
+      <SortOrder value="7" />
+    </PackageDisplaySettings>
+  </Package>
+</AdminArsenal.Export>

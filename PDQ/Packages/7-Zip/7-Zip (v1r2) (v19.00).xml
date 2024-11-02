@@ -1,0 +1,364 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AdminArsenal.Export Code="PDQDeploy" Name="PDQ Deploy" Version="18.1.0.0" MinimumVersion="15.0">
+  <Package>
+    <CurrentLibraryPackageVersionId value="null" />
+    <PackageDefinition name="Definition">
+      <Conditions type="list">
+        <PackageStepCondition>
+          <Architecture>Both</Architecture>
+          <Version>All</Version>
+          <TypeName>OperatingSystem</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <IsUserLoggedOn>NoLoggedOnUser</IsUserLoggedOn>
+          <TypeName>LoggedOnUser</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <ConditionMode>None</ConditionMode>
+          <InventoryCollectionId value="null" />
+          <InventoryCollectionName></InventoryCollectionName>
+          <TypeName>Collection</TypeName>
+        </PackageStepCondition>
+      </Conditions>
+      <CopyMode>Default</CopyMode>
+      <DelayedApprovalTimeSpan>7.00:00:00</DelayedApprovalTimeSpan>
+      <DownloadApprovalMode>Manual</DownloadApprovalMode>
+      <InventoryScanProfileId value="null" />
+      <IsDownloadApprovalModeInherited value="true" />
+      <ScanAfterDeployment value="null" />
+      <Steps type="list">
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script># Update Me
+[Array]$Programs = @(
+    
+)
+
+[Array]$ProgramDirs = @(
+    "$Env:ProgramFiles\7-zip\"
+    "${Env:ProgramFiles(x86)}\7-zip\"
+)
+
+#Don't Edit Below this line
+###############################################################################################################################
+IF (($Programs + $ProgramDirs).count -gt 0) {
+    [System.Diagnostics.Process]::GetProcesses() |Where-Object {Select-String -InputObject $_.Path -Pattern ($Programs + $ProgramDirs) -SimpleMatch} |ForEach {
+         Try {
+              Stop-Process -Id $Process.id -Force -ErrorAction Stop -whatif
+         } Catch {
+              IF ($_.Exception -match "Cannot find a process with the process identifier") {
+               
+              } Else {
+                   Write-Error -Message $_.Exception
+              }
+         }
+    }
+} Else {
+    Write-Error "Both `$Programs and $ProgramDirs are empty so no criteria was able to be matched."
+}</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Stop Processes (v3)</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script>#Update Me
+[String]$Search = '7-zip'
+
+#Possible Options are: 'Regex','Simple',Exact'
+[String]$SearchType = 'Simple'
+
+#Possible options are "x86", "x64" and "both"
+[String]$Arch = 'both'
+
+# If uninstaller is an exe use these silent uninstall flags. If no flags should be added but still attempt exe uninstalls
+# using the ininstall string use 'none'
+[String]$EXEFlags = '/s'
+
+# Don't Edit Below this line
+###############################################################################################################################
+[Bool]$Debug = $False
+[Array]$Properties = @('DisplayName', 'DisplayVersion', 'ParentKey', 'UninstallString', 'AppArch')
+[System.Collections.ArrayList]$Keys = New-Object -TypeName 'System.Collections.ArrayList'
+[Void]$Keys.Add([PSObject]@{
+        'HKLM' = "Software\Microsoft\Windows\CurrentVersion\Uninstall"
+    })
+
+IF ([System.Environment]::Is64BitOperatingSystem) {
+    [Void]$Keys.Add([PSObject]@{
+            'HKLM' = "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+        })
+}
+[Array]$UserKeys = Get-ChildItem -Path Registry::HKEY_USERS
+FOREACH ($UserKey IN $UserKeys) {
+    [Void]$Keys.Add([PSObject]@{
+            'HKU' = "$UserKey\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+        })
+}
+
+[System.Collections.ArrayList]$Result = New-Object -TypeName 'System.Collections.ArrayList'
+FOREACH ($Key IN $Keys) {
+    SWITCH ($Key.Keys) {
+        'HKLM' {
+            $BaseKey = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $ENV:ComputerName)
+        }
+        'HKU'  {
+            $BaseKey = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::Users, $ENV:ComputerName)
+        }
+        Default {
+            Write-Error -Message "Invalid registry key root."
+            EXIT 1
+        }
+    }
+    $RegKey = $BaseKey.OpenSubkey($key.Values[0])
+    IF ($RegKey -ne $null) {
+        FOREACH ($subName IN $RegKey.getsubkeynames()) {
+            FOREACH ($sub IN $RegKey.opensubkey($subName)) {
+                [string]$Name = $sub.getvalue("displayname")
+                IF ($Name.trim().Length -gt 0) {
+                    
+                    #If search option selected and $Name doesn't match, move to next item
+                    IF (![string]::IsNullOrEmpty($Search) -AND (
+                            ($SearchType -eq 'Regex' -AND $Name -NotMatch $Search) -OR
+                            ($SearchType -eq 'Simple' -AND $Name -NOTLIKE "*$Search*") -OR
+                            ($SearchType -eq 'Exact' -AND $Name -NE $Search))
+                    ) {
+                        CONTINUE
+                    }
+                    
+                    $HashProperty = @{
+                    } #This should probably be; New-Object -TypeName 'System.Collections.ArrayList'
+                    FOREACH ($CurrentProperty IN $Properties) {
+                        SWITCH ($CurrentProperty) {
+                            "ParentKey" {
+                                $HashProperty.ParentKey = $subName
+                            }
+                            "AppArch" {
+                                IF ($Keys.Count -eq 2 -AND $Key -eq $Keys[0]) {
+                                    $HashProperty.AppArch = "x64"
+                                } ELSE {
+                                    $HashProperty.AppArch = "x86"
+                                }
+                            }
+                            Default {
+                                $HashProperty.$CurrentProperty = $sub.GetValue($CurrentProperty)
+                            }
+                        }
+                    } #End-ForEach
+                    $HashProperty.RegKey = $RegKey
+                    [Void]$Result.add([psCustomObject]$HashProperty)
+                } #End-IF
+            } #End-ForEach
+        } #End-Foreach
+    } #End-IF
+} #End-ForEach
+
+FOREACH ($App IN ($Result | Where-Object {
+            $_.AppArch -eq $Arch -OR $Arch -eq "Both"
+        })) {
+    IF ($App.UninstallString -match "msiexec") {
+        $ProcessStartInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $ProcessStartInfo.FileName = "$ENV:Windir\System32\msiexec.exe"
+        $ProcessStartInfo.Arguments = "/x $($App.ParentKey) /qn"
+        $ProcessStartInfo.CreateNoWindow = $True
+        $ProcessStartInfo.UseShellExecute = $False
+        $ProcessStartInfo.RedirectStandardOutput = $True
+        $ProcessStartInfo.RedirectStandardInput = $True
+        $ProcessStartInfo.RedirectStandardError = $True
+        $ProcessStartInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+        $ProcessStartInfo.LoadUserProfile = $False
+        IF ($Debug) {
+            Write-Output "Installing $($App.Name)"
+        } ELSE {
+            $Process = [System.Diagnostics.Process]::Start($ProcessStartInfo)
+            $Process.WaitForExit()
+        }
+        
+    } ELSEIF ($App.UninstallString -match ".exe") {
+        IF ([string]::IsNullOrEmpty($EXEFlags.Trim()) -AND $EXEFlags -ne "None") {
+            Write-Error -Message "EXE detected but no 'EXEFlags' have been configured. "
+        } Else {
+            $ProcessStartInfo = New-Object System.Diagnostics.ProcessStartInfo
+            $ProcessStartInfo.FileName = $App.UninstallString
+            $ProcessStartInfo.Arguments = $EXEFlags
+            $ProcessStartInfo.CreateNoWindow = $True
+            $ProcessStartInfo.UseShellExecute = $False
+            $ProcessStartInfo.RedirectStandardOutput = $True
+            $ProcessStartInfo.RedirectStandardInput = $True
+            $ProcessStartInfo.RedirectStandardError = $True
+            $ProcessStartInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+            $ProcessStartInfo.LoadUserProfile = $False
+            IF ($Debug) {
+                Write-Output "Debug: Installing $($App.DisplayName)"
+            } ELSE {
+                $Process = [System.Diagnostics.Process]::Start($ProcessStartInfo)
+                $Process.WaitForExit()
+            }
+        }
+    } ELSEIF([string]::IsNullOrEmpty($App.UninstallString))  {
+        Write-Output "Wing"
+    } Else {
+        Write-Output "Unable to handle these kinds of installers"
+        Write-Output $App.DisplayName
+    }
+}</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Bits64</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Uninstaller (v3)</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+        <InstallStep>
+          <CustomCommandLine></CustomCommandLine>
+          <FileName>$(Repository)\7-Zip\7-Zip\19.00\x86\7z1900.msi</FileName>
+          <Files></Files>
+          <IncludeDirectory value="false" />
+          <LeaveInstallFile value="false" />
+          <MsiOperation>Install</MsiOperation>
+          <MsiQuiet value="true" />
+          <MsiRestart>Never</MsiRestart>
+          <Parameters></Parameters>
+          <SuccessCodes>0,1641,3010</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Bits32</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Install Application (32-Bit)</Title>
+          <TypeName>Install</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </InstallStep>
+        <InstallStep>
+          <CustomCommandLine></CustomCommandLine>
+          <FileName>$(Repository)\7-Zip\7-Zip\19.00\x64\7z1900-x64.msi</FileName>
+          <Files></Files>
+          <IncludeDirectory value="false" />
+          <LeaveInstallFile value="false" />
+          <MsiOperation>Install</MsiOperation>
+          <MsiQuiet value="true" />
+          <MsiRestart>Never</MsiRestart>
+          <Parameters></Parameters>
+          <SuccessCodes>0,1641,3010</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Bits64</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Install Application (64-bit)</Title>
+          <TypeName>Install</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </InstallStep>
+      </Steps>
+      <Timeout value="60" />
+      <UseCustomTimeout value="false" />
+      <RunAs value="null" />
+    </PackageDefinition>
+    <Description>7-Zip is free software with open source. The most of the code is under the GNU LGPL license. Some parts of the code are under the BSD 3-clause License. Also there is unRAR license restriction for some parts of the code.
+
+Home Page
+ - https://www.7-zip.org/
+
+Installation Download
+ - https://www.7-zip.org/download.html
+
+Installation Documentation
+ - https://www.7-zip.org/faq.html
+
+Other Useful Resources
+
+#=================================================================
+# Admin Notes
+#=================================================================
+To-Do List
+ -</Description>
+    <NewLibraryPackageVersionId value="null" />
+    <OriginalId value="null" />
+    <Version>19.00</Version>
+    <IsAutoDownload value="false" />
+    <FolderId value="6" />
+    <LibraryPackageVersionId value="null" />
+    <Name>7-Zip (v1r2) (v19.00)</Name>
+    <Path>Packages\Installers\7-Zip (v1r2) (v19.00)</Path>
+    <PackageDisplaySettings name="DisplaySettings">
+      <DisplayType>Normal</DisplayType>
+      <IconKey>Icon-Package</IconKey>
+      <SortOrder value="7" />
+    </PackageDisplaySettings>
+  </Package>
+</AdminArsenal.Export>

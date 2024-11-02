@@ -1,0 +1,395 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AdminArsenal.Export Code="PDQDeploy" Name="PDQ Deploy" Version="18.1.0.0" MinimumVersion="15.0">
+  <Package>
+    <CurrentLibraryPackageVersionId value="null" />
+    <PackageDefinition name="Definition">
+      <Conditions type="list">
+        <PackageStepCondition>
+          <Architecture>Both</Architecture>
+          <Version>All</Version>
+          <TypeName>OperatingSystem</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <IsUserLoggedOn>NoLoggedOnUser</IsUserLoggedOn>
+          <TypeName>LoggedOnUser</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <ConditionMode>None</ConditionMode>
+          <InventoryCollectionId value="null" />
+          <InventoryCollectionName></InventoryCollectionName>
+          <TypeName>Collection</TypeName>
+        </PackageStepCondition>
+      </Conditions>
+      <CopyMode>Default</CopyMode>
+      <DelayedApprovalTimeSpan>7.00:00:00</DelayedApprovalTimeSpan>
+      <DownloadApprovalMode>Manual</DownloadApprovalMode>
+      <InventoryScanProfileId value="null" />
+      <IsDownloadApprovalModeInherited value="true" />
+      <ScanAfterDeployment value="null" />
+      <Steps type="list">
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script>#Update Me
+[String]$Search = 'Google Chrome'
+
+
+#Possible Options are: 'Regex','Simple',Exact'
+[String]$SearchType = 'Simple'
+
+#Possible options are "x86", "x64" and "both"
+[String]$Arch = 'x86'
+
+# If uninstaller is an exe use these silent uninstall flags. If no flags should be added but still attempt exe uninstalls
+# using the ininstall string use 'none'
+[String]$EXEFlags = '/s'
+
+# Don't Edit Below this line
+###############################################################################################################################
+[Bool]$Debug = $False
+[Array]$Properties = @('DisplayName', 'DisplayVersion', 'ParentKey', 'UninstallString', 'AppArch')
+[System.Collections.ArrayList]$Keys = New-Object -TypeName 'System.Collections.ArrayList'
+[Void]$Keys.Add([PSObject]@{
+        'HKLM' = "Software\Microsoft\Windows\CurrentVersion\Uninstall"
+    })
+
+IF ([System.Environment]::Is64BitOperatingSystem) {
+    [Void]$Keys.Add([PSObject]@{
+            'HKLM' = "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+        })
+}
+[Array]$UserKeys = Get-ChildItem -Path Registry::HKEY_USERS
+FOREACH ($UserKey IN $UserKeys) {
+    [Void]$Keys.Add([PSObject]@{
+            'HKU' = "$UserKey\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+        })
+}
+
+[System.Collections.ArrayList]$Result = New-Object -TypeName 'System.Collections.ArrayList'
+FOREACH ($Key IN $Keys) {
+    SWITCH ($Key.Keys) {
+        'HKLM' {
+            $BaseKey = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $ENV:ComputerName)
+        }
+        'HKU'  {
+            $BaseKey = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::Users, $ENV:ComputerName)
+        }
+        Default {
+            Write-Error -Message "Invalid registry key root."
+            EXIT 1
+        }
+    }
+    $RegKey = $BaseKey.OpenSubkey($key.Values[0])
+    IF ($RegKey -ne $null) {
+        FOREACH ($subName IN $RegKey.getsubkeynames()) {
+            FOREACH ($sub IN $RegKey.opensubkey($subName)) {
+                [string]$Name = $sub.getvalue("displayname")
+                IF ($Name.trim().Length -gt 0) {
+                    
+                    #If search option selected and $Name doesn't match, move to next item
+                    IF (![string]::IsNullOrEmpty($Search) -AND (
+                            ($SearchType -eq 'Regex' -AND $Name -NotMatch $Search) -OR
+                            ($SearchType -eq 'Simple' -AND $Name -NOTLIKE "*$Search*") -OR
+                            ($SearchType -eq 'Exact' -AND $Name -NE $Search))
+                    ) {
+                        CONTINUE
+                    }
+                    
+                    $HashProperty = @{
+                    } #This should probably be; New-Object -TypeName 'System.Collections.ArrayList'
+                    FOREACH ($CurrentProperty IN $Properties) {
+                        SWITCH ($CurrentProperty) {
+                            "ParentKey" {
+                                $HashProperty.ParentKey = $subName
+                            }
+                            "AppArch" {
+                                
+                                IF ($Key.Values -match "Wow6432Node" -OR 
+                                    $sub.GetValue("DisplayName") -match "64-bit" -OR
+                                    $sub.GetValue("DisplayName") -match "x64" -OR
+                                    $sub.GetValue("DisplayName") -match "64 bit"
+                              ) {
+                                    $HashProperty.AppArch = "x64"
+                                } ELSE {
+                                    $HashProperty.AppArch = "x86"
+                                }
+                            }
+                            Default {
+                                $HashProperty.$CurrentProperty = $sub.GetValue($CurrentProperty)
+                            }
+                        }
+                    } #End-ForEach
+                    $HashProperty.RegKey = $RegKey
+                    [Void]$Result.add([psCustomObject]$HashProperty)
+                } #End-IF
+            } #End-ForEach
+        } #End-Foreach
+    } #End-IF
+} #End-ForEach
+
+FOREACH ($App IN ($Result | Where-Object {
+            $_.AppArch -eq $Arch -OR $Arch -eq "Both"
+        })) {
+    IF ($App.UninstallString -match "msiexec") {
+        $ProcessStartInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $ProcessStartInfo.FileName = "$ENV:Windir\System32\msiexec.exe"
+        $ProcessStartInfo.Arguments = "/x $($App.ParentKey) /qn"
+        $ProcessStartInfo.CreateNoWindow = $True
+        $ProcessStartInfo.UseShellExecute = $False
+        $ProcessStartInfo.RedirectStandardOutput = $True
+        $ProcessStartInfo.RedirectStandardInput = $True
+        $ProcessStartInfo.RedirectStandardError = $True
+        $ProcessStartInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+        $ProcessStartInfo.LoadUserProfile = $False
+        IF ($Debug) {
+            Write-Output "Installing $($App.Name)"
+        } ELSE {
+            $Process = [System.Diagnostics.Process]::Start($ProcessStartInfo)
+            $Process.WaitForExit()
+        }
+        
+    } ELSEIF ($App.UninstallString -match ".exe") {
+        IF ([string]::IsNullOrEmpty($EXEFlags.Trim()) -AND $EXEFlags -ne "None") {
+            Write-Error -Message "EXE detected but no 'EXEFlags' have been configured. "
+        } Else {
+            $ProcessStartInfo = New-Object System.Diagnostics.ProcessStartInfo
+            $ProcessStartInfo.FileName = (($App.UninstallString -split ".exe")[0]).Trim('"') + ".exe"
+            $ProcessStartInfo.Arguments = (($App.UninstallString -split ".exe")[1]).Trim('"').Trim()
+            $ProcessStartInfo.CreateNoWindow = $True
+            $ProcessStartInfo.UseShellExecute = $False
+            $ProcessStartInfo.RedirectStandardOutput = $True
+            $ProcessStartInfo.RedirectStandardInput = $True
+            $ProcessStartInfo.RedirectStandardError = $True
+            $ProcessStartInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+            $ProcessStartInfo.LoadUserProfile = $False
+            IF ($Debug) {
+                Write-Output "Debug: Installing $($App.DisplayName)"
+            } ELSE {
+                $Process = [System.Diagnostics.Process]::Start($ProcessStartInfo)
+                $Process.WaitForExit()
+            }
+        }
+    } ELSEIF([string]::IsNullOrEmpty($App.UninstallString))  {
+        Write-Output "Win"
+    } Else {
+        Write-Output "Unable to handle these kinds of installers"
+        Write-Output $App.DisplayName
+    }
+}</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Bits64</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Uninstaller (v3): Uninstall x32 on x64</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="false" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+        <FileCopyStep>
+          <AllowOverwrite value="false" />
+          <CopyAllFiles value="false" />
+          <FilePatternsText></FilePatternsText>
+          <IgnoreOverwriteErrors value="false" />
+          <IncludeSubFolders value="false" />
+          <Mode>SingleFile</Mode>
+          <Source>$(Repository)\Google\Chrome\master_preferences</Source>
+          <Target>%ProgramFiles%\Google\Chrome\Application\</Target>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Copy Master Preferences</Title>
+          <TypeName>FileCopy</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </FileCopyStep>
+        <InstallStep>
+          <CustomCommandLine></CustomCommandLine>
+          <FileName>$(Repository)\Google\Chrome\83.0.4103.61\x86\GoogleChromeStandaloneEnterprise.msi</FileName>
+          <Files></Files>
+          <IncludeDirectory value="false" />
+          <LeaveInstallFile value="false" />
+          <MsiOperation>Install</MsiOperation>
+          <MsiQuiet value="true" />
+          <MsiRestart>Never</MsiRestart>
+          <Parameters></Parameters>
+          <SuccessCodes>0,1641,3010</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Bits32</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Install Chrome (32-bit)</Title>
+          <TypeName>Install</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </InstallStep>
+        <InstallStep>
+          <CustomCommandLine></CustomCommandLine>
+          <FileName>$(Repository)\Google\Chrome\83.0.4103.61\x64\GoogleChromeStandaloneEnterprise64.msi</FileName>
+          <Files></Files>
+          <IncludeDirectory value="false" />
+          <LeaveInstallFile value="false" />
+          <MsiOperation>Install</MsiOperation>
+          <MsiQuiet value="true" />
+          <MsiRestart>Never</MsiRestart>
+          <Parameters></Parameters>
+          <SuccessCodes>0,1641,3010</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Bits64</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Install Chrome (64-bit)</Title>
+          <TypeName>Install</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </InstallStep>
+        <CommandStep>
+          <Command>%SystemRoot%\System32\Reg.exe ADD "HKLM\SOFTWARE\Policies\Google\Update" /v Update{8A69D345-D564-463C-AFF1-A69D9E530F96} /d 0 /t REG_DWORD /f</Command>
+          <Files></Files>
+          <SuccessCodes>0,1</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>DoesNotExist</ConditionMode>
+              <Hive>HKEY_LOCAL_MACHINE</Hive>
+              <IncludeSubKeys value="false" />
+              <Key>SOFTWARE\Policies\Google\Update</Key>
+              <MatchToWow6432 value="false" />
+              <TextCompare>Contains</TextCompare>
+              <Value>0</Value>
+              <ValueCompare>Equal</ValueCompare>
+              <ValueName>UpdateDefault</ValueName>
+              <ValueType>Number</ValueType>
+              <TypeName>Registry</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>Continue</ErrorMode>
+          <Title>Disable Auto Update</Title>
+          <TypeName>Command</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </CommandStep>
+      </Steps>
+      <Timeout value="60" />
+      <UseCustomTimeout value="false" />
+      <RunAs value="null" />
+    </PackageDefinition>
+    <Description>Google Chrome is a cross-platform web browser developed by Google. It was first released in 2008 for Microsoft Windows, and was later ported to Linux, macOS, iOS, and Android. The browser is also the main component of Chrome OS, where it serves as the platform for web apps.
+
+Home Page
+ - https://www.google.com/chrome/
+
+Installation Download
+ - https://cloud.google.com/chrome-enterprise/browser/download/#
+
+Installation Documentation
+ - 
+
+Other Useful Resources
+
+#=================================================================
+# Admin Notes
+#=================================================================
+Adobe Flash (PPAPI) is no longer included in Google Chrome Enterprise but will be automatically installed in Chrome when needed (requires internet access and the policy "Enables component updates in Google Chrome" enabled). In cases where component updates cannot be upgraded, use the Adobe Flash for PPAPI package in the Package Library.
+
+Link to Google's explanation why they are forcing computers to run the 64-bit Chrome as of version 58.0.3029.96:
+https://chromereleases.googleblog.com/2017/05/stable-channel-update-for-desktop.html
+
+To-Do List
+ -</Description>
+    <NewLibraryPackageVersionId value="null" />
+    <OriginalId value="null" />
+    <Version></Version>
+    <IsAutoDownload value="false" />
+    <FolderId value="6" />
+    <LibraryPackageVersionId value="null" />
+    <Name>Google Chrome Enterprise (v1r1) (v83.0.4103.61)</Name>
+    <Path>Packages\Installers\Google Chrome Enterprise (v1r1) (v83.0.4103.61)</Path>
+    <PackageDisplaySettings name="DisplaySettings">
+      <DisplayType>Normal</DisplayType>
+      <IconKey>Icon-Package</IconKey>
+      <SortOrder value="7" />
+    </PackageDisplaySettings>
+  </Package>
+</AdminArsenal.Export>

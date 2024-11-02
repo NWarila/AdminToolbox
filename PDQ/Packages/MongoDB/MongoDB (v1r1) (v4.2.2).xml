@@ -1,0 +1,163 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AdminArsenal.Export Code="PDQDeploy" Name="PDQ Deploy" Version="18.1.0.0" MinimumVersion="15.0">
+  <Package>
+    <CurrentLibraryPackageVersionId value="null" />
+    <PackageDefinition name="Definition">
+      <Conditions type="list">
+        <PackageStepCondition>
+          <Architecture>Bits64</Architecture>
+          <Version>All</Version>
+          <TypeName>OperatingSystem</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <IsUserLoggedOn>NoLoggedOnUser</IsUserLoggedOn>
+          <TypeName>LoggedOnUser</TypeName>
+        </PackageStepCondition>
+        <PackageStepCondition>
+          <ConditionMode>None</ConditionMode>
+          <InventoryCollectionId value="null" />
+          <InventoryCollectionName></InventoryCollectionName>
+          <TypeName>Collection</TypeName>
+        </PackageStepCondition>
+      </Conditions>
+      <CopyMode>Default</CopyMode>
+      <DelayedApprovalTimeSpan>7.00:00:00</DelayedApprovalTimeSpan>
+      <DownloadApprovalMode>Manual</DownloadApprovalMode>
+      <InventoryScanProfileId value="null" />
+      <IsDownloadApprovalModeInherited value="true" />
+      <ScanAfterDeployment value="null" />
+      <Steps type="list">
+        <PowerShellStep>
+          <CustomCommandLine></CustomCommandLine>
+          <Files></Files>
+          <Script># Update Me
+[Array]$Programs = @()
+
+[Array]$ProgramDirs = @(
+    "$Env:ProgramFiles\MongoDB\"
+    "${Env:ProgramFiles(x86)}\MongoDB\"
+)
+
+# Don't Edit Below this line
+###############################################################################################################################
+New-Variable -Name Processes -Value (Get-Process |Select Id,Path) -Description "List of all running processes." -Force
+New-Variable -Name Running1 -Value @{} -Description "List of all running applications that need to be killed." -Force
+New-Variable -Name Running2 -Value @{} -Description "List of all running applications that need to be killed." -Force
+
+IF (![string]::IsNullOrEmpty($ProgramDirs)) {
+    $Running1 = $Processes.path | Select-String -Pattern $ProgramDirs -SimpleMatch |Select -Unique
+}
+
+IF (![string]::IsNullOrEmpty($Programs)) {
+    $Running2 = $Processes.path | Select-String -Pattern $Programs -SimpleMatch |Select -Unique
+}
+Try {
+    ForEach ($Process in ($Running1,$Running2)) {
+            $Processes | Where {$_.path -eq $Process} |Stop-Process -Force
+    }
+    Exit 0
+} Catch {
+    $_.Exception
+    Exit 1
+}</Script>
+          <SuccessCodes>0</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Both</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Stop Processes (v3)</Title>
+          <TypeName>PowerShell</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </PowerShellStep>
+        <InstallStep>
+          <CustomCommandLine></CustomCommandLine>
+          <FileName>$(Repository)\MongoDB\MongoDB\4.2.2\mongodb-win32-x86_64-2012plus-4.2.2-signed.msi</FileName>
+          <Files></Files>
+          <IncludeDirectory value="false" />
+          <LeaveInstallFile value="false" />
+          <MsiOperation>Install</MsiOperation>
+          <MsiQuiet value="true" />
+          <MsiRestart>Never</MsiRestart>
+          <Parameters>ADDLOCAL="ServerNoService,Client"</Parameters>
+          <SuccessCodes>0,1641,3010</SuccessCodes>
+          <RunAs value="null" />
+          <Conditions type="list">
+            <PackageStepCondition>
+              <Architecture>Bits64</Architecture>
+              <Version>All</Version>
+              <TypeName>OperatingSystem</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <IsUserLoggedOn>AlwaysRun</IsUserLoggedOn>
+              <TypeName>LoggedOnUser</TypeName>
+            </PackageStepCondition>
+            <PackageStepCondition>
+              <ConditionMode>None</ConditionMode>
+              <InventoryCollectionId value="null" />
+              <InventoryCollectionName></InventoryCollectionName>
+              <TypeName>Collection</TypeName>
+            </PackageStepCondition>
+          </Conditions>
+          <ErrorMode>StopDeploymentFail</ErrorMode>
+          <Title>Install Application</Title>
+          <TypeName>Install</TypeName>
+          <IsEnabled value="true" />
+          <IsPostStep value="false" />
+          <IsPreStep value="false" />
+        </InstallStep>
+      </Steps>
+      <Timeout value="60" />
+      <UseCustomTimeout value="false" />
+      <RunAs value="null" />
+    </PackageDefinition>
+    <Description>MongoDB is a general purpose, document-based, distributed database built for modern application developers and for the cloud era. No database is more productive to use.
+
+Home Page
+ - https://www.mongodb.com/
+
+Installation Download
+ - https://www.mongodb.com/download-center/community
+
+Installation Documentation
+ - https://docs.mongodb.com/guides/server/install/
+
+Other Useful Resources
+ - https://docs.mongodb.com/guides/
+
+#=================================================================
+# Admin Notes
+#=================================================================
+To-Do List
+ -</Description>
+    <NewLibraryPackageVersionId value="null" />
+    <OriginalId value="null" />
+    <Version></Version>
+    <IsAutoDownload value="false" />
+    <FolderId value="6" />
+    <LibraryPackageVersionId value="null" />
+    <Name>MongoDB (v1r1) (v4.2.2)</Name>
+    <Path>Packages\Installers\MongoDB (v1r1) (v4.2.2)</Path>
+    <PackageDisplaySettings name="DisplaySettings">
+      <DisplayType>Normal</DisplayType>
+      <IconKey>Icon-Package</IconKey>
+      <SortOrder value="7" />
+    </PackageDisplaySettings>
+  </Package>
+</AdminArsenal.Export>
